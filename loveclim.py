@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import plotxtor as px
+import netCDF4 as nc
 
 def Figure(x,y,c,
            xh=None,
@@ -324,3 +325,30 @@ def ReadGlobals(filename):
     
 
     return t,Y,D,T
+
+class netCDF_Viewer():
+
+    def __init__(self,filename):
+
+        self.filename = filename
+        self.ds = nc.Dataset(filename)
+
+        self._ReadNames()
+        
+    def _ReadNames(self):
+
+        ds = self.ds
+
+        self.names = []
+        self.long_names = []
+        self.standard_names = []
+        
+        for v in ds.variables:
+            if 'name' in dir(ds[v]):
+                self.names.append(str(ds.variables[v].name))
+            if 'long_name' in dir(ds[v]):
+                self.long_names.append(str(ds.variables[v].long_name))
+            if 'standard_name' in dir(ds[v]):
+                self.standard_names.append(str(ds.variables[v].standard_name))
+
+        
