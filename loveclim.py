@@ -326,29 +326,19 @@ def ReadGlobals(filename):
 
     return t,Y,D,T
 
-class netCDF_Viewer():
 
-    def __init__(self,filename):
+def ReadNames(filename):
 
-        self.filename = filename
-        self.ds = nc.Dataset(filename)
-
-        self._ReadNames()
+    ds = nc.Dataset(filename)
+    
+    names = []
+    long_names = []
+    standard_names = []
         
-    def _ReadNames(self):
+    for v in ds.variables:
+        if 'long_name' in dir(ds[v]):
+            names.append(str(ds.variables[v].name))
+            long_names.append(str(ds.variables[v].long_name))
+            standard_names.append(str(ds.variables[v].standard_name))
 
-        ds = self.ds
-
-        self.names = []
-        self.long_names = []
-        self.standard_names = []
-        
-        for v in ds.variables:
-            if 'name' in dir(ds[v]):
-                self.names.append(str(ds.variables[v].name))
-            if 'long_name' in dir(ds[v]):
-                self.long_names.append(str(ds.variables[v].long_name))
-            if 'standard_name' in dir(ds[v]):
-                self.standard_names.append(str(ds.variables[v].standard_name))
-
-        
+    return names,long_names,standard_names
