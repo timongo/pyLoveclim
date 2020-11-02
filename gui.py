@@ -144,10 +144,10 @@ class netCDF_GUI():
         self.names = names
         self.long_names = long_names
         self.standard_names = standard_names
-        lb_names = [long_names[i] for i in range(len(names)) if names[i] not in excluded_names]
+        self.lb_names = ['{:} ({:})'.format(long_names[i],self.ds[names[i]].units) for i in range(len(names)) if names[i] not in excluded_names]
 
         maxlen=0
-        for name in lb_names:
+        for name in self.lb_names:
             l = len(name)
             if l>maxlen:
                 maxlen = l
@@ -161,7 +161,7 @@ class netCDF_GUI():
                                    exportselection=False,
                                    width=maxlen)
         self.scrollbar.config(command=self.Field_lb.yview)
-        for name in lb_names:
+        for name in self.lb_names:
             self.Field_lb.insert(tk.END,name)
         self.Field_lb.selection_set(0)
         self.Field_lb.event_generate("<<ListboxSelect>>")
@@ -291,7 +291,8 @@ class netCDF_GUI():
         self.ax = plt.axes(projection=projection)
         self.ax.set_global()
         self.ax.coastlines()
-        self.ax.contourf(lon, lat, data,transform=ccrs.PlateCarree())
+        im = self.ax.contourf(lon, lat, data,transform=ccrs.PlateCarree(),cmap=plt.get_cmap('coolwarm'))
+        self.cb = plt.colorbar(im)
         self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
         try:
             self.Zvar_var.set('{:} @ {:} = {:d} {:}'.format(self.Field_lb.get(self.Field_lb.curselection()),
@@ -313,6 +314,7 @@ class netCDF_GUI():
         # check for figure 1
         if self.plotexists:
             self.ax.clear()
+            self.cb.remove()
             self._Plot()
 
     def _ReadParams(self):
@@ -373,7 +375,7 @@ class netCDF_GUI():
         Maps long names to names
         """
         
-        name = self.names[self.long_names.index(long_name)]
+        name = self.names[self.long_names.index(long_name.split(' (')[0])]
 
         return name
         
