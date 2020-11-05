@@ -43,6 +43,7 @@ class loveclim_GUI:
         AllFiles = os.listdir(os.getcwd())
         
         lcfiles = [File for File in AllFiles if File.endswith('.nc')]
+        lcfiles.sort()
         nlc = len(lcfiles)
 
         if nlc!=0:
