@@ -362,14 +362,28 @@ class netCDF_GUI():
         Close the data set by setting additional values at the end of the arrays
         """
 
-        bc_lon = np.zeros(len(lon)+1)
-        bc_data = np.zeros((data.shape[0],len(lon)+1))
-        bc_lon[:-1] = lon[:]
-        bc_lon[-1] = 360.
-        bc_data[:,:-1] = data[:,:]
-        bc_data[:,-1] = data[:,0]
-        
-        return bc_lon,bc_data
+        # Two possibilities: the mask is an array or it is just equal to False
+        if type(data.mask)==np.bool_:
+            bc_lon = np.zeros(len(lon)+1)
+            bc_data = np.zeros((data.shape[0],len(lon)+1))
+            bc_lon[:-1] = lon[:]
+            bc_lon[-1] = 360.
+            bc_data[:,:-1] = data.data[:,:]
+            bc_data[:,-1] = data.data[:,0]
+
+            return bc_lon,np.ma.array(bc_data,mask=False)        
+        else:
+            bc_lon = np.zeros(len(lon)+1)
+            bc_data = np.zeros((data.shape[0],len(lon)+1))
+            bc_mask = np.zeros((data.shape[0],len(lon)+1))
+            bc_lon[:-1] = lon[:]
+            bc_lon[-1] = 360.
+            bc_data[:,:-1] = data.data[:,:]
+            bc_mask[:,:-1] = data.mask[:,:]
+            bc_data[:,-1] = data.data[:,0]
+            bc_mask[:,-1] = data.mask[:,0]
+
+            return bc_lon,np.ma.array(bc_data,mask=bc_mask.astype(bool))
 
     def _Name(self,long_name):
         """
