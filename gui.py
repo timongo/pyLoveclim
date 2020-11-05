@@ -47,19 +47,33 @@ class loveclim_GUI:
         nlc = len(lcfiles)
 
         if nlc!=0:
-            # Loveclim netcdf files
-            self.Open_b = tk.Button(self.frame,text="Open selected netCDF File",
-                                    bg=green,
-                                    highlightbackground=green,
-                                    font=self.buttonfont,
-                                    command=self.Open_netCDF_File)
+            # Loveclim Atmos (A) of Vecode (V) files
+            self.AV_Open_b = tk.Button(self.frame,text="Open selected\n Atmos or Vecode File",
+                                       bg=green,
+                                       highlightbackground=green,
+                                       font=self.buttonfont,
+                                       command=self.AV_Open)
+            # Loveclim Ocean (O) files (CLIO)
+            self.O_Open_b = tk.Button(self.frame,text="Open selected\n Atmos or Vecode File",
+                                      bg=green,
+                                      highlightbackground=green,
+                                      font=self.buttonfont,
+                                      command=self.O_Open)
             # Scrollbar for the .nc files
             self.scrollbar = tk.Scrollbar(self.frame)
+
+            # File listbox
+            maxlen=0
+            for filename in lcfiles:
+                l = len(filename)
+                if l>maxlen:
+                    maxlen = l
             self.ncFiles_lb = tk.Listbox(self.frame,
-                                       selectmode=tk.SINGLE,
-                                       yscrollcommand=self.scrollbar.set,
-                                       font=self.fieldfont,
-                                       exportselection=False)
+                                         selectmode=tk.SINGLE,
+                                         yscrollcommand=self.scrollbar.set,
+                                         font=self.fieldfont,
+                                         exportselection=False,
+                                         width=maxlen)
             self.scrollbar.config(command=self.ncFiles_lb.yview)
             for filename in lcfiles:
                 self.ncFiles_lb.insert(tk.END,filename)
@@ -75,24 +89,36 @@ class loveclim_GUI:
                                 font=self.buttonfont)
         # Layout
         self.frame.grid()
-        row=0
         if nlc!=0:
-            self.ncFiles_lb.grid(row=row,rowspan=2,column=0,sticky="ew")
-            self.scrollbar.grid(row=row,rowspan=2,column=1,sticky="wsn")
-            self.Open_b.grid(row=0,column=2)
-        self.Quit_b.grid(row=1,column=2)
+            self.ncFiles_lb.grid(row=0,rowspan=2,column=0,sticky="ew")
+            self.scrollbar.grid(row=0,rowspan=2,column=1,sticky="wsn")
+            self.AV_Open_b.grid(row=0,column=2)
+            self.O_Open_b.grid(row=1,column=2)
+        self.Quit_b.grid(row=2,column=2)
             
 
-    def Open_netCDF_File(self):
+    def AV_Open(self):
         """
-        Open netcdf file
+        Open Atmos or Vecode file
         """
         id = self.ncFiles_lb.curselection()
         self.filename = self.ncFiles_lb.get(id)
         self.newWindow = tk.Toplevel(self.master)
-        self.app = netCDF_GUI(self.newWindow,self.filename)
+        self.app = AV_netCDF_GUI(self.newWindow,self.filename)
 
-class netCDF_GUI():
+    def O_Open(self):
+        """
+        Open Ocean file
+        """
+        id = self.ncFiles_lb.curselection()
+        self.filename = self.ncFiles_lb.get(id)
+        self.newWindow = tk.Toplevel(self.master)
+        self.app = O_netCDF_GUI(self.newWindow,self.filename)
+
+class AV_netCDF_GUI():
+    """
+    GUI for Atmos or Ocean files
+    """
     
     def __init__(self,master,filename):
 
@@ -116,10 +142,10 @@ class netCDF_GUI():
         # Read data
         self.ds = nc.Dataset(self.filename)
         # Prepare projections
-        self.projections = [ccrs.PlateCarree,
-                            ccrs.Robinson,
+        self.projections = [ccrs.Orthographic,
                             ccrs.Mercator,
-                            ccrs.Orthographic]
+                            ccrs.Robinson,
+                            ccrs.PlateCarree]
         # Setup GUI
         self._SetupGui()
 
@@ -204,7 +230,7 @@ class netCDF_GUI():
         # Projection option menu
         self.Proj_l = tk.Label(self.frame,text = "Projection:",
                                font=self.textfont)
-        self.Proj_options = ["PlateCarree","Robinson","Mercator","Orthographic"]
+        self.Proj_options = ["Orthographic","Mercator","Robinson","PlateCarree"]
         self.Proj_var = tk.StringVar(self.frame)
         self.Proj_var.set(self.Proj_options[0])
         self.Proj_om = tk.OptionMenu(self.frame,
