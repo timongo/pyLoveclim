@@ -327,8 +327,10 @@ def ReadGlobals(filename):
     return t,Y,D,T
 
 
-def ReadNames(filename):
-
+def ReadNames_AV(filename):
+    """
+    For Atmos and Vecode
+    """
     ds = nc.Dataset(filename)
     
     names = []
@@ -342,3 +344,19 @@ def ReadNames(filename):
             standard_names.append(str(ds.variables[v].standard_name))
 
     return names,long_names,standard_names
+
+def ReadNames_O(filename):
+    """
+    For Ocean (no standard name)
+    """
+    ds = nc.Dataset(filename)
+    
+    names = []
+    long_names = []
+        
+    for v in ds.variables:
+        if 'long_name' in dir(ds[v]):
+            names.append(str(ds.variables[v].name))
+            long_names.append(str(ds.variables[v].long_name))
+
+    return names,long_names
