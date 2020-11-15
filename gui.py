@@ -54,7 +54,7 @@ class loveclim_GUI:
                                        font=self.buttonfont,
                                        command=self.AV_Open)
             # Loveclim Ocean (O) files (CLIO)
-            self.O_Open_b = tk.Button(self.frame,text="Open selected\n Atmos or Vecode File",
+            self.O_Open_b = tk.Button(self.frame,text="Open selected\n Ocean File",
                                       bg=green,
                                       highlightbackground=green,
                                       font=self.buttonfont,
