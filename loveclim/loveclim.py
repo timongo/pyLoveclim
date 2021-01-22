@@ -5,7 +5,7 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-import plotxtor as px
+#import plotxtor as px
 import netCDF4 as nc
 
 def Figure(x,y,c,
