@@ -749,10 +749,19 @@ class O_netCDF_GUI():
         return name
         
 
-def main():    
+def GI_netcdf(datapath='.'):
+    """
+    Function that launches the Graphics Interface for netcdf outputs.
+    PARAMETER:
+        datapath : string : path where there are the atmym*.nc files.
+
+    """    
+    cwd = os.getcwd()
+    os.chdir(datapath)
     window = tk.Tk()
     gui = loveclim_GUI(window)
     window.mainloop()
+    os.chdir(cwd)
 
 if __name__ == '__main__':
-    main()
+    GI_netcdf()
