@@ -12,7 +12,7 @@ from loveclim.gui import np, os, plt
 import sys
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib as mpl
-plt.rc('text', usetex=True)
+plt.rc('text', usetex=False)
 plt.rc('font', family='serif')
 pad = 0.
 w_pad = 0.
@@ -134,10 +134,10 @@ def Gemmes_quick_view(namef, path='.', y_ini=2016, y_stop=2100, labels=None):
 
     # y labels
     axes[0,0].set_ylabel(r'$Y$')
-    axes[0,1].set_ylabel(r'$T~(^\circ)$')
+    axes[0,1].set_ylabel(r'$T~(^\circ C)$')
     axes[0,2].set_ylabel(r'$\omega$')
     axes[1,0].set_ylabel(r'$\lambda$')
-    axes[1,1].set_ylabel(r'$E$ (Gt\,CO$_2$)')
+    axes[1,1].set_ylabel(r'$E$ (Gt CO$_2$)')
     axes[1,2].set_ylabel(r'$d$')
 
     # legend
