@@ -5,6 +5,7 @@ import loveclim as lc
 import netCDF4 as nc
 import cartopy.crs as ccrs
 import cartopy
+from scipy.interpolate import interp1d
 import os
 import matplotlib
 import matplotlib.pyplot as plt
@@ -18,6 +19,21 @@ matplotlib.interactive('t')
 exitcolor = "#df0101"
 green = "#9afe2e"
 blue = "#33adff"
+
+# set the colormap and centre the colorbar
+class MidpointNormalize(matplotlib.colors.Normalize):
+    """
+    Normalise the colorbar.
+    """
+
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        matplotlib.colors.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
+
 
 class loveclim_GUI:
     """
@@ -115,7 +131,7 @@ class loveclim_GUI:
         self.newWindow = tk.Toplevel(self.master)
         self.app = O_netCDF_GUI(self.newWindow,self.filename)
 
-class AV_netCDF_GUI():
+class AV_netCDF_GUI(MidpointNormalize):
     """
     GUI for Atmos or Vecode files
     """
@@ -146,6 +162,22 @@ class AV_netCDF_GUI():
                             ccrs.Mercator,
                             ccrs.Robinson,
                             ccrs.PlateCarree]
+        # For Mora-like maps
+        Threshold_T = np.array([26.5, 27. , 27.5, 28. , 28.5, 29. , 29.5, 30. , 30.5, 31. , 31.5,
+                                32. , 32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. , 36.5, 37. ,
+                                37.5, 38. , 38.5, 39. , 39.5, 40. , 40.5, 41. , 41.5, 42. , 42.5,
+                                43. , 43.5, 44. , 44.5, 45. , 45.5, 46. , 46.5, 47. , 47.5, 48. ,
+                                48.5])
+        Threshold_H = np.array([100.109,  89.015,  82.441,  76.078,  71.895,  67.712,  63.529,
+                                59.493,  57.152,  54.812,  52.471,  50.131,  47.79 ,  45.449,
+                                43.109,  40.807,  39.081,  37.355,  35.628,  33.902,  32.175,
+                                30.449,  28.723,  26.996,  25.291,  24.016,  22.741,  21.466,
+                                20.191,  18.916,  17.641,  16.366,  15.091,  13.817,  12.55 ,
+                                11.614,  10.678,   9.742,   8.805,   7.869,   6.933,   5.997,
+                                5.06 ,   4.124,   3.188])
+        # the following function gives the temperature deadly threshold 
+        # as a function of the local relative humidity
+        self.MoraDeadlyThreshold = interp1d(Threshold_H,Threshold_T)
         # Setup GUI
         self._SetupGui()
 
@@ -190,6 +222,8 @@ class AV_netCDF_GUI():
         self.scrollbar.config(command=self.Field_lb.yview)
         for name in self.lb_names:
             self.Field_lb.insert(tk.END,name)
+        if ('Relative Humidity' in long_names) and ('Temperature at 2 Meter' in long_names):
+            self.Field_lb.insert(tk.END,'Mora Deadly Threshold (K)')
         self.Field_lb.selection_set(0)
         self.Field_lb.event_generate("<<ListboxSelect>>")
         self.Field_lb.bind("<<ListboxSelect>>",self._Enter)
@@ -318,7 +352,19 @@ class AV_netCDF_GUI():
         self.ax = plt.axes(projection=projection)
         self.ax.set_global()
         self.ax.coastlines()
-        im = self.ax.contourf(lon, lat, data,transform=ccrs.PlateCarree(),cmap=plt.get_cmap('coolwarm'))
+        if self.fieldname=='mora':
+            cmap = plt.get_cmap('bwr')
+            im = self.ax.contourf(lon, lat, data,50,
+                                  transform=ccrs.PlateCarree(),
+                                  cmap=cmap,
+                                  vmin=data.min(),
+                                  vmax=data.max(),
+                                  norm=MidpointNormalize(data.min(),data.max(),0.))
+        else:
+            cmap = plt.get_cmap('coolwarm')
+            im = self.ax.contourf(lon, lat, data,
+                                  transform=ccrs.PlateCarree(),
+                                  cmap=cmap)
         self.cb = plt.colorbar(im)
         self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
         try:
@@ -363,24 +409,37 @@ class AV_netCDF_GUI():
 
         lon = self.ds['lon'][:]
         lat = self.ds['lat'][:]
-        rawdata = self.ds[self.fieldname][:]
-        fieldvar = self.ds[self.fieldname]
+        if self.fieldname!='mora':
 
-        if len(rawdata.shape)==3:
-            try:
-                del self.zvar_longname
-                del self.zvar_val
-                del self.zvar_units
-            except AttributeError:
-                pass
-            return lon,lat,rawdata[self.itime,:,:]
-        elif len(rawdata.shape)==4:
-            maxzvar = rawdata.shape[1]
-            self.zvar_actual = min(self.zvar+1,maxzvar)-1
-            self.zvar_longname = self.ds[fieldvar.dimensions[1]].long_name
-            self.zvar_val = self.ds[fieldvar.dimensions[1]][self.zvar_actual]
-            self.zvar_units = self.ds[fieldvar.dimensions[1]].units
-            return lon,lat,rawdata[self.itime,self.zvar_actual,:,:]
+            rawdata = self.ds[self.fieldname][:]
+            fieldvar = self.ds[self.fieldname]
+
+            if len(rawdata.shape)==3:
+                try:
+                    del self.zvar_longname
+                    del self.zvar_val
+                    del self.zvar_units
+                except AttributeError:
+                    pass
+                return lon,lat,rawdata[self.itime,:,:]
+            elif len(rawdata.shape)==4:
+                maxzvar = rawdata.shape[1]
+                self.zvar_actual = min(self.zvar+1,maxzvar)-1
+                self.zvar_longname = self.ds[fieldvar.dimensions[1]].long_name
+                self.zvar_val = self.ds[fieldvar.dimensions[1]][self.zvar_actual]
+                self.zvar_units = self.ds[fieldvar.dimensions[1]].units
+                return lon,lat,rawdata[self.itime,self.zvar_actual,:,:]
+
+        else:
+            # Temperature at 2 meters in degree C
+            t2m = self.ds['t2m'][:][self.itime,:,:]-273.15
+            # relative humidity (in percentage)
+            rh = self.ds['r'][:][self.itime,:,:]*100
+            # we take the maximum of the data and 0 (actually -.1 to always have something to plot)
+            # in order to emphasize the above threshold part of the data
+            data = np.maximum(t2m.data - self.MoraDeadlyThreshold(rh.data),-1.)
+            rawdata = np.ma.masked_array(data,mask=t2m.mask)
+            return lon,lat,rawdata
 
     def _PeriodicBoundaryConditions(self,lon,data):
         """
@@ -415,9 +474,10 @@ class AV_netCDF_GUI():
         Maps long names to names
         """
         
-        name = self.names[self.long_names.index(long_name.split(' (')[0])]
-
-        return name
+        if long_name == 'Mora Deadly Threshold (K)':
+            return 'mora'
+        else:
+            return self.names[self.long_names.index(long_name.split(' (')[0])]
 
 class O_netCDF_GUI():
     """
@@ -634,7 +694,8 @@ class O_netCDF_GUI():
         self.ax = plt.axes(projection=projection)
         self.ax.set_global()
         self.ax.coastlines()
-        im = self.ax.scatter(lon, lat, c=data,marker='s',transform=ccrs.PlateCarree(),cmap=plt.get_cmap('coolwarm'))
+        cmap = plt.get_cmap('coolwarm')
+        im = self.ax.scatter(lon, lat, c=data,marker='s',transform=ccrs.PlateCarree(),cmap=cmap)
         self.cb = plt.colorbar(im)
         self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
         try:
@@ -744,10 +805,8 @@ class O_netCDF_GUI():
         Maps long names to names
         """
         
-        name = self.names[self.long_names.index(long_name.split(' (')[0])]
+        return self.names[self.long_names.index(long_name.split(' (')[0])]
 
-        return name
-        
 
 def GI_netcdf(datapath='.'):
     """
