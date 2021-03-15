@@ -85,7 +85,7 @@ def load_Gemmes_data(path='.', y_ini=2016, y_stop=2030):
     return Data_dict
 
 # Gemmes_quick_view
-def Gemmes_quick_view(namef, path='.', y_ini=2016, y_stop=2100, labels=None):
+def Gemmes_quick_view(namef, path='.', y_ini=2016, y_stop=2100, labels='', returnfig=False):
     """
     Function that can be used for quick view of a typicall Gemmes/Iloveclim
     simulation. A figure is created containing the fields : Y, T, omega,
@@ -111,15 +111,34 @@ def Gemmes_quick_view(namef, path='.', y_ini=2016, y_stop=2100, labels=None):
         dataDict.append(load_Gemmes_data(path=p, y_ini=y_ini[Np],
         y_stop=y_stop[Np]))
 
+    # If at least one label is '', then label is the mean temperature in 2100
+    labbool = False
+    for lab in labels:
+        if lab=='':
+            labbool = True
+    if labbool:
+        lenlab = len(labels)
+        labels = []
+        for Np in range(lenlab):
+            time = dataDict[Np]['time']
+            temp = dataDict[Np]['T']
+            ind = (time >= 2095)*(time <= 2105)
+            labels.append('+{:.1f}°C'.format(np.mean(temp[ind])))
+
+
+    print(time[-190:-180], dataDict[Np]['T'][-190:-180])
+
     # make figure
     fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(6.5, 4)) 
     for Np, lab in enumerate(labels):
-        axes[0,0].plot(dataDict[Np]['time'], dataDict[Np]['Y'], label=lab)
-        axes[0,1].plot(dataDict[Np]['time'], dataDict[Np]['T'], label=lab)
-        axes[0,2].plot(dataDict[Np]['time'], dataDict[Np]['omega'], label=lab)
-        axes[1,0].plot(dataDict[Np]['time'], dataDict[Np]['lambda'], label=lab)
-        axes[1,1].plot(dataDict[Np]['time'], dataDict[Np]['E'], label=lab)
-        axes[1,2].plot(dataDict[Np]['time'], dataDict[Np]['d'], label=lab)
+        time = dataDict[Np]['time']
+        axes[0,0].plot(time, dataDict[Np]['Y'], label=lab)
+        axes[0,1].plot(time, dataDict[Np]['T'], label=lab)
+        axes[1,1].plot(time, dataDict[Np]['omega'], label=lab)
+        axes[1,0].plot(time, dataDict[Np]['lambda'], label=lab)
+        Elab = np.trapz(dataDict[Np]['E'], dx=1)
+        axes[0,2].plot(time, dataDict[Np]['E'], label='{:.0f}'.format(Elab))
+        axes[1,2].plot(time, dataDict[Np]['d'], label=lab)
 
     # labels
     axes = np.asarray(axes)
@@ -135,13 +154,18 @@ def Gemmes_quick_view(namef, path='.', y_ini=2016, y_stop=2100, labels=None):
     # y labels
     axes[0,0].set_ylabel(r'$Y$')
     axes[0,1].set_ylabel(r'$T~(^\circ C)$')
-    axes[0,2].set_ylabel(r'$\omega$')
+    axes[1,1].set_ylabel(r'$\omega$')
     axes[1,0].set_ylabel(r'$\lambda$')
-    axes[1,1].set_ylabel(r'$E$ (Gt CO$_2$)')
+    axes[0,2].set_ylabel(r'$E$ (Gt CO$_2$)')
     axes[1,2].set_ylabel(r'$d$')
 
-    # legend
-    axes[0,0].legend()
-    plt.tight_layout(pad, h_pad, w_pad)
-    plt.savefig(namef)
-    plt.close(fig)
+    if not returnfig:
+        # legend
+        axes[0,0].legend()
+        plt.tight_layout(pad=0)
+        print(namef)
+        plt.savefig(namef)
+        plt.close(fig)
+
+    else:
+        return fig, axes

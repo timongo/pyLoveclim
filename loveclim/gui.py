@@ -75,6 +75,12 @@ class loveclim_GUI:
                                       highlightbackground=green,
                                       font=self.buttonfont,
                                       command=self.O_Open)
+            # Loveclim Downscaling (D) files (Downscaling)
+            self.D_Open_b = tk.Button(self.frame,text="Open selected\n Downscaling File",
+                                      bg=green,
+                                      highlightbackground=green,
+                                      font=self.buttonfont,
+                                      command=self.D_Open)
             # Scrollbar for the .nc files
             self.scrollbar = tk.Scrollbar(self.frame)
 
@@ -110,7 +116,8 @@ class loveclim_GUI:
             self.scrollbar.grid(row=0,rowspan=2,column=1,sticky="wsn")
             self.AV_Open_b.grid(row=0,column=2)
             self.O_Open_b.grid(row=1,column=2)
-        self.Quit_b.grid(row=2,column=2)
+            self.D_Open_b.grid(row=2,column=2)
+        self.Quit_b.grid(row=3,column=2)
             
 
     def AV_Open(self):
@@ -121,6 +128,15 @@ class loveclim_GUI:
         self.filename = self.ncFiles_lb.get(id)
         self.newWindow = tk.Toplevel(self.master)
         self.app = AV_netCDF_GUI(self.newWindow,self.filename)
+
+    def D_Open(self):
+        """
+        Open Atmos or Vecode file
+        """
+        id = self.ncFiles_lb.curselection()
+        self.filename = self.ncFiles_lb.get(id)
+        self.newWindow = tk.Toplevel(self.master)
+        self.app = AV_netCDF_GUI(self.newWindow,self.filename, AV=False)
 
     def O_Open(self):
         """
@@ -136,7 +152,7 @@ class AV_netCDF_GUI(MidpointNormalize):
     GUI for Atmos or Vecode files
     """
     
-    def __init__(self,master,filename):
+    def __init__(self,master,filename,AV=True):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -156,7 +172,9 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.itime=0
         self.filename = filename
         # Read data
+        self.AV = AV
         self.ds = nc.Dataset(self.filename)
+        # bool True whether it is Atmos or vecode, False for downsaling
         # Prepare projections
         self.projections = [ccrs.Orthographic,
                             ccrs.Mercator,
@@ -197,13 +215,29 @@ class AV_netCDF_GUI(MidpointNormalize):
                                 font=self.buttonfont)
 
         # List of names to exclude (not fields)
-        excluded_names = ["lon","lat","time","P_T3","P_T4","P_U3"]
+        if self.AV:
+            excluded_names = ["lon","lat","time","P_T3","P_T4","P_U3"]
+        else:
+            excluded_names = ["x","y","time"]
         # get variable names (only if they have a 'long_name')
-        names,long_names,standard_names = lc.ReadNames_AV(self.filename)
+        names,long_names,standard_names = lc.ReadNames_AV(self.filename, AV=self.AV)
         self.names = names
         self.long_names = long_names
         self.standard_names = standard_names
-        self.lb_names = ['{:} ({:})'.format(long_names[i],self.ds[names[i]].units) for i in range(len(names)) if names[i] not in excluded_names]
+        units = []
+        for i in range(len(names)):
+            try:
+                units.append(self.ds[names[i]].units)
+            except AttributeError:
+                if names[i]=='Tann':
+                    un = 'K'
+                elif names[i]=='Acc':
+                    un = 'cm.yr-1'
+                elif names[i]=='relhum':
+                    un = '1'
+                units.append(un)
+
+        self.lb_names = ['{:} ({:})'.format(long_names[i],units[i]) for i in range(len(names)) if names[i] not in excluded_names]
 
         maxlen=0
         for name in self.lb_names:
@@ -275,12 +309,13 @@ class AV_netCDF_GUI(MidpointNormalize):
         menu.config(font=self.fieldfont)
 
         # Central Longitude scale
+        res = 10
         self.Clon_s = tk.Scale(self.frame,
                                orient='horizontal',
                                command=self._Replot,
                                from_=-180,
                                to=180,
-                               resolution=10,
+                               resolution=res,
                                label='Central longitude',
                                tickinterval=45,
                                font=self.textfont)
@@ -292,7 +327,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                                command=self._Replot,
                                from_=-90,
                                to=90,
-                               resolution=10,
+                               resolution=res,
                                label='Central latitude',
                                tickinterval=45,
                                font=self.textfont)
@@ -361,6 +396,12 @@ class AV_netCDF_GUI(MidpointNormalize):
                                   vmax=data.max(),
                                   norm=MidpointNormalize(data.min(),data.max(),0.))
         else:
+            if not self.AV:
+                dats = data.shape[1]
+                ddat = data[:,dats//2:]
+                data = np.hstack((ddat, data[:,:dats//2]))
+                print("FAUT SE FAIRE DES OPTIONS/BOUTONS VMIN VMAX POUR LA COLORBAR")
+                data[data<-10.] = -10.
             cmap = plt.get_cmap('coolwarm')
             im = self.ax.contourf(lon, lat, data,
                                   transform=ccrs.PlateCarree(),
@@ -407,8 +448,23 @@ class AV_netCDF_GUI(MidpointNormalize):
         Read fields from nc file
         """
 
-        lon = self.ds['lon'][:]
-        lat = self.ds['lat'][:]
+        if self.AV:
+            lon = self.ds['lon'][:]
+            lat = self.ds['lat'][:]
+        
+        else:
+            x = self.ds['x'][:]+5600000.0
+            x /= np.amax(x)
+            x *= 360
+            y = self.ds['y'][:]+5200000.
+            y /= np.amax(y)
+            y *= 180
+            y -= 90
+            print('ATTENTION CONVERSION EN lon lat DEGUEULASSE')
+
+            lon = x.copy()
+            lat = y.copy()
+
         if self.fieldname!='mora':
 
             rawdata = self.ds[self.fieldname][:]

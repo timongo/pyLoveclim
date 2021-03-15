@@ -327,7 +327,7 @@ def ReadGlobals(filename):
     return t,Y,D,T
 
 
-def ReadNames_AV(filename):
+def ReadNames_AV(filename, AV=True):
     """
     For Atmos and Vecode
     """
@@ -336,12 +336,17 @@ def ReadNames_AV(filename):
     names = []
     long_names = []
     standard_names = []
-        
-    for v in ds.variables:
-        if 'long_name' in dir(ds[v]):
+
+    if AV:
+        for v in ds.variables:
+            if 'long_name' in dir(ds[v]):
+                names.append(str(ds.variables[v].name))
+                long_names.append(str(ds.variables[v].long_name))
+                standard_names.append(str(ds.variables[v].standard_name))
+    else:
+        for v in ds.variables:
             names.append(str(ds.variables[v].name))
-            long_names.append(str(ds.variables[v].long_name))
-            standard_names.append(str(ds.variables[v].standard_name))
+            long_names.append(str(ds.variables[v].name))
 
     return names,long_names,standard_names
 
