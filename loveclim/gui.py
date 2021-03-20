@@ -12,9 +12,6 @@ import matplotlib.pyplot as plt
 import platform
 if platform.system()=='Darwin':
     matplotlib.use('MacOSX')
-else:
-    matplotlib.use('TkAgg')
-matplotlib.interactive('t')
 
 exitcolor = "#df0101"
 green = "#9afe2e"
@@ -56,12 +53,32 @@ class loveclim_GUI:
         self.buttonfont = font.Font(family='Helvetica', size=22, weight='bold')
         font.families()
 
-        AllFiles = os.listdir(os.getcwd())
-        
+        path = os.getcwd()
+        self.path = path
+        # files for atmos
+        self.atmospath = os.path.join(path, 'atmos')
+        AllFiles = os.listdir(self.atmospath)
         lcfiles = [File for File in AllFiles if File.endswith('.nc')]
         lcfiles.sort()
         nlc = len(lcfiles)
+        os.chdir(path)
 
+        # files for downscaling
+        self.oceanpath = os.path.join(path, 'ocean')
+        AllFiles3 = os.listdir(self.oceanpath)
+        lcfiles3 = [File for File in AllFiles3 if File.endswith('.nc')]
+        lcfiles3.sort()
+        nlc3 = len(lcfiles3)
+        os.chdir(path)
+
+        # files for downscaling
+        self.downspath = os.path.join(path, 'downscaling')
+        AllFiles2 = os.listdir(self.downspath)
+        lcfiles2 = [File for File in AllFiles2 if File.endswith('.nc')]
+        lcfiles2.sort()
+        nlc2 = len(lcfiles2)
+        os.chdir(path)
+ 
         if nlc!=0:
             # Loveclim Atmos (A) of Vecode (V) files
             self.AV_Open_b = tk.Button(self.frame,text="Open selected\n Atmos or Vecode File",
@@ -69,19 +86,7 @@ class loveclim_GUI:
                                        highlightbackground=green,
                                        font=self.buttonfont,
                                        command=self.AV_Open)
-            # Loveclim Ocean (O) files (CLIO)
-            self.O_Open_b = tk.Button(self.frame,text="Open selected\n Ocean File",
-                                      bg=green,
-                                      highlightbackground=green,
-                                      font=self.buttonfont,
-                                      command=self.O_Open)
-            # Loveclim Downscaling (D) files (Downscaling)
-            self.D_Open_b = tk.Button(self.frame,text="Open selected\n Downscaling File",
-                                      bg=green,
-                                      highlightbackground=green,
-                                      font=self.buttonfont,
-                                      command=self.D_Open)
-            # Scrollbar for the .nc files
+           # Scrollbar for the .nc files
             self.scrollbar = tk.Scrollbar(self.frame)
 
             # File listbox
@@ -100,8 +105,56 @@ class loveclim_GUI:
             for filename in lcfiles:
                 self.ncFiles_lb.insert(tk.END,filename)
             self.ncFiles_lb.selection_set(0)
-#             self.ncFiles_lb.event_generate("<<ListboxSelect>>")
-#             self.ncFiles_lb.bind("<<ListboxSelect>>",self._Enter)
+
+        if nlc3!=0:
+            # Loveclim Ocean (O) files (CLIO)
+            self.O_Open_b = tk.Button(self.frame,text="Open selected\n Ocean File",
+                                      bg=green,
+                                      highlightbackground=green,
+                                      font=self.buttonfont,
+                                      command=self.O_Open)
+
+            # File listbox ocean
+            maxlen=0
+            for filename in lcfiles3:
+                l = len(filename)
+                if l>maxlen:
+                    maxlen = l
+            self.ncFiles_lb3 = tk.Listbox(self.frame,
+                                         selectmode=tk.SINGLE,
+                                         yscrollcommand=self.scrollbar.set,
+                                         font=self.fieldfont,
+                                         exportselection=False,
+                                         width=maxlen)
+            self.scrollbar.config(command=self.ncFiles_lb3.yview)
+            for filename in lcfiles3:
+                self.ncFiles_lb3.insert(tk.END,filename)
+            self.ncFiles_lb3.selection_set(0)
+
+        if nlc2!=0:
+            # Loveclim Downscaling (D) files (Downscaling)
+            self.D_Open_b = tk.Button(self.frame,text="Open selected\n Downscaling File",
+                                      bg=green,
+                                      highlightbackground=green,
+                                      font=self.buttonfont,
+                                      command=self.D_Open)
+
+            # File listbox downscaling
+            maxlen=0
+            for filename in lcfiles2:
+                l = len(filename)
+                if l>maxlen:
+                    maxlen = l
+            self.ncFiles_lb2 = tk.Listbox(self.frame,
+                                         selectmode=tk.SINGLE,
+                                         yscrollcommand=self.scrollbar.set,
+                                         font=self.fieldfont,
+                                         exportselection=False,
+                                         width=maxlen)
+            self.scrollbar.config(command=self.ncFiles_lb2.yview)
+            for filename in lcfiles2:
+                self.ncFiles_lb2.insert(tk.END,filename)
+            self.ncFiles_lb2.selection_set(0)
 
         self.Quit_b = tk.Button(self.frame,
                                 text="Exit",
@@ -112,11 +165,15 @@ class loveclim_GUI:
         # Layout
         self.frame.grid()
         if nlc!=0:
-            self.ncFiles_lb.grid(row=0,rowspan=2,column=0,sticky="ew")
-            self.scrollbar.grid(row=0,rowspan=2,column=1,sticky="wsn")
-            self.AV_Open_b.grid(row=0,column=2)
-            self.O_Open_b.grid(row=1,column=2)
-            self.D_Open_b.grid(row=2,column=2)
+            self.ncFiles_lb.grid(row=0,rowspan=1,column=0,sticky="ew")
+        if nlc3!=0:
+            self.ncFiles_lb3.grid(row=1,rowspan=1,column=0,sticky="ew")
+        if nlc2!=0:
+            self.ncFiles_lb2.grid(row=2,rowspan=1,column=0,sticky="ew")
+        self.scrollbar.grid(row=0,rowspan=1,column=1,sticky="wsn")
+        self.AV_Open_b.grid(row=0,column=2)
+        self.O_Open_b.grid(row=1,column=2)
+        self.D_Open_b.grid(row=2,column=2)
         self.Quit_b.grid(row=3,column=2)
             
 
@@ -124,35 +181,45 @@ class loveclim_GUI:
         """
         Open Atmos or Vecode file
         """
+        os.chdir(self.atmospath)
         id = self.ncFiles_lb.curselection()
         self.filename = self.ncFiles_lb.get(id)
         self.newWindow = tk.Toplevel(self.master)
         self.app = AV_netCDF_GUI(self.newWindow,self.filename)
+        os.chdir(self.path)
 
     def D_Open(self):
         """
-        Open Atmos or Vecode file
+        Open Downscaling and Atmos file
         """
-        id = self.ncFiles_lb.curselection()
-        self.filename = self.ncFiles_lb.get(id)
+        os.chdir(self.atmospath)
+        id2 = self.ncFiles_lb.curselection()
+        self.filename_atmos = self.ncFiles_lb.get(id2)
+        os.chdir(self.downspath)
+        id = self.ncFiles_lb2.curselection()
+        self.filename = self.ncFiles_lb2.get(id)
         self.newWindow = tk.Toplevel(self.master)
-        self.app = AV_netCDF_GUI(self.newWindow,self.filename, AV=False)
+        self.app = AV_netCDF_GUI(self.newWindow,self.filename, AV=False,
+                filename_atmos=self.filename_atmos,path=self.downspath,atmospath=self.atmospath)
+        os.chdir(self.path)
 
     def O_Open(self):
         """
         Open Ocean file
         """
-        id = self.ncFiles_lb.curselection()
-        self.filename = self.ncFiles_lb.get(id)
+        os.chdir(self.oceanpath)
+        id = self.ncFiles_lb3.curselection()
+        self.filename = self.ncFiles_lb3.get(id)
         self.newWindow = tk.Toplevel(self.master)
         self.app = O_netCDF_GUI(self.newWindow,self.filename)
+        os.chdir(self.path)
 
 class AV_netCDF_GUI(MidpointNormalize):
     """
     GUI for Atmos or Vecode files
     """
     
-    def __init__(self,master,filename,AV=True):
+    def __init__(self,master,filename,AV=True,filename_atmos='',path='',atmospath=''):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -171,10 +238,17 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.fieldname = ""
         self.itime=0
         self.filename = filename
-        # Read data
-        self.AV = AV
-        self.ds = nc.Dataset(self.filename)
         # bool True whether it is Atmos or vecode, False for downsaling
+        self.AV = AV
+        self.filename_atmos = filename_atmos
+        self.path = path
+        self.atmospath = atmospath
+        # Read data
+        self.ds = nc.Dataset(self.filename)
+        if not self.AV:
+            os.chdir(self.atmospath)
+            self.ds_atmos = nc.Dataset(self.filename_atmos)
+            os.chdir(self.path)
         # Prepare projections
         self.projections = [ccrs.Orthographic,
                             ccrs.Mercator,
@@ -219,6 +293,7 @@ class AV_netCDF_GUI(MidpointNormalize):
             excluded_names = ["lon","lat","time","P_T3","P_T4","P_U3"]
         else:
             excluded_names = ["x","y","time"]
+
         # get variable names (only if they have a 'long_name')
         names,long_names,standard_names = lc.ReadNames_AV(self.filename, AV=self.AV)
         self.names = names
@@ -230,14 +305,15 @@ class AV_netCDF_GUI(MidpointNormalize):
                 units.append(self.ds[names[i]].units)
             except AttributeError:
                 if names[i]=='Tann':
-                    un = 'K'
+                    un = '°C'
                 elif names[i]=='Acc':
                     un = 'cm.yr-1'
                 elif names[i]=='relhum':
                     un = '1'
                 units.append(un)
 
-        self.lb_names = ['{:} ({:})'.format(long_names[i],units[i]) for i in range(len(names)) if names[i] not in excluded_names]
+        self.lb_names = ['{:} ({:})'.format(long_names[i],units[i])
+                for i in range(len(names)) if names[i] not in excluded_names]
 
         maxlen=0
         for name in self.lb_names:
@@ -333,6 +409,48 @@ class AV_netCDF_GUI(MidpointNormalize):
                                font=self.textfont)
         self.Clat_s.set(0)
 
+        # Colorbar
+        self.CCbar_l0 = tk.Label(self.frame,
+                                text="Colorbar",
+                                font=self.textfont)
+        self.CCbar_l1 = tk.Label(self.frame,
+                                text="min:",
+                                font=self.textfont)
+        self.CCbar_l2 = tk.Label(self.frame,
+                                text="max:",
+                                font=self.textfont)
+        self.CCbar_sb = tk.Spinbox(self.frame,
+                                   command=self._Replot,
+                                   from_=0,
+                                   to=0,
+                                   font=self.textfont)
+        self.CCbar_sb.bind('<Return>',self._Enter)
+        self.CCbar_sb.bind('<KP_Enter>',self._Enter)
+        self.CCbar_ssb = tk.Spinbox(self.frame,
+                                   command=self._Replot,
+                                   from_=0,
+                                   to=0,
+                                   font=self.textfont)
+        self.CCbar_ssb.bind('<Return>',self._Enter)
+        self.CCbar_ssb.bind('<KP_Enter>',self._Enter)
+        self.CCPlot = tk.Button(self.frame,text="Load Colorbar",
+                                bg=green,
+                                highlightbackground=green,
+                                font=self.buttonfont,
+                                command=self.load_CC)
+
+        # nb contour
+        self.cont_l = tk.Label(self.frame,
+                                text="Nb contour:",
+                                font=self.textfont)
+        self.cont_sb = tk.Spinbox(self.frame,
+                                   command=self._Replot,
+                                   from_=10,
+                                   to=100,
+                                   font=self.textfont)
+        self.cont_sb.bind('<Return>',self._Enter)
+        self.cont_sb.bind('<KP_Enter>',self._Enter)
+ 
         # Plotbutton
         self.Plot_b = tk.Button(self.frame,text="Plot",
                                 bg=green,
@@ -357,12 +475,56 @@ class AV_netCDF_GUI(MidpointNormalize):
         row = row+1
         self.Clat_s.grid(row=row,column=2,columnspan=3,sticky="ew")
         row=row+1
+        self.CCbar_l0.grid(row=row,column=2,sticky="e")
+        row = row+1
+        self.CCbar_l1.grid(row=row,column=2,sticky="e")
+        self.CCbar_sb.grid(row=row,column=3,sticky="w")
+        self.CCrow = row
+        row = row+1
+        self.CCbar_l2.grid(row=row,column=2,sticky="e")
+        self.CCbar_ssb.grid(row=row,column=3,sticky="w")
+        row = row+1
+        self.CCPlot.grid(row=row,column=2,columnspan=3,sticky="ew")
+        row=row+1
+        self.cont_l.grid(row=row,column=2,sticky="e")
+        self.cont_sb.grid(row=row,column=3,sticky="w")
+        row = row+1
         self.Proj_l.grid(row=row,column=2,sticky="e")
         self.Proj_om.grid(row=row,column=3,sticky="w")
         row=row+1
         self.Plot_b.grid(row=row,column=2,columnspan=3,sticky="ew")
         row=row+1
         self.Quit_b.grid(row=row,column=2,columnspan=3,sticky="ew")
+
+    def load_CC(self):
+        """
+        loqd colorbar values
+        """
+        # load values
+        self._ReadParams()
+        lon,lat,data = self._GetPlotFields(CCbar=True)
+        datmax, datmin = np.amax(data), np.amin(data)
+
+        # update colorbar
+        self.CCbar_sb = tk.Spinbox(self.frame,
+                                   command=self._Replot,
+                                   from_=datmin,
+                                   to=datmax,
+                                   font=self.textfont)
+        self.CCbar_sb.bind('<Return>',self._Enter)
+        self.CCbar_sb.bind('<KP_Enter>',self._Enter)
+        self.CCbar_ssb = tk.Spinbox(self.frame,
+                                   command=self._Replot,
+                                   from_=datmin,
+                                   to=datmax,
+                                   font=self.textfont)
+        self.CCbar_ssb.bind('<Return>',self._Enter)
+        self.CCbar_ssb.bind('<KP_Enter>',self._Enter)
+        row = self.CCrow
+        self.CCbar_sb.grid(row=row,column=3,sticky="w")
+        row = row+1
+        self.CCbar_ssb.grid(row=row,column=3,sticky="w")
+ 
 
     def _Plot(self):
         """
@@ -371,8 +533,14 @@ class AV_netCDF_GUI(MidpointNormalize):
 
         self._ReadParams()
 
-        lon,lat,data = self._GetPlotFields()
+        if self.AV:
+            lon,lat,data = self._GetPlotFields()
+        else:
+            lon,lat,data,lonat,latat,dataat = self._GetPlotFields()
+
         lon,data = self._PeriodicBoundaryConditions(lon,data)
+        if not self.AV:
+            lonat,dataat = self._PeriodicBoundaryConditions(lonat,dataat)
 
         projectionfun = self.projections[self.Proj_options.index(self.proj)]
         if self.proj=='Orthographic':
@@ -396,23 +564,30 @@ class AV_netCDF_GUI(MidpointNormalize):
                                   vmax=data.max(),
                                   norm=MidpointNormalize(data.min(),data.max(),0.))
         else:
-            if not self.AV:
-                dats = data.shape[1]
-                ddat = data[:,dats//2:]
-                data = np.hstack((ddat, data[:,:dats//2]))
-                print("FAUT SE FAIRE DES OPTIONS/BOUTONS VMIN VMAX POUR LA COLORBAR")
-                data[data<-10.] = -10.
+            vmin = float(self.CCbar_sb.get())
+            vmax = float(self.CCbar_ssb.get())
+            if (vmin>vmax):
+                vmin, vmax = np.amin(data), np.amax(data)
+            cont = max(10,int(self.cont_sb.get()))
+            levels = np.linspace(start=vmin, stop=vmax, num=cont)
+
             cmap = plt.get_cmap('coolwarm')
-            im = self.ax.contourf(lon, lat, data,
-                                  transform=ccrs.PlateCarree(),
+            print(np.amin(dataat), np.amax(dataat), np.amin(data), np.amax(data))
+            im = self.ax.contourf(lonat, latat, dataat, levels=levels,
+                                  transform=ccrs.PlateCarree(self.clon),
                                   cmap=cmap)
+            if not self.AV:
+                im = self.ax.contourf(lon, lat, data, levels=levels,
+                                      transform=ccrs.PlateCarree(self.clon+180.),
+                                      cmap=cmap)
         self.cb = plt.colorbar(im)
         self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
         try:
-            self.Zvar_var.set('{:} @ {:} = {:d} {:}'.format(self.Field_lb.get(self.Field_lb.curselection()),
-                                                            self.zvar_longname,
-                                                            int(self.zvar_val),
-                                                            self.zvar_units))
+            self.Zvar_var.set('{:} @ {:} = {:d} {:}'.format(
+                self.Field_lb.get(self.Field_lb.curselection()),
+                self.zvar_longname,
+                int(self.zvar_val),
+                self.zvar_units))
         except AttributeError:
             self.Zvar_var.set('')
         
@@ -443,7 +618,7 @@ class AV_netCDF_GUI(MidpointNormalize):
     def _Enter(self,even):
         self._Replot()
 
-    def _GetPlotFields(self):
+    def _GetPlotFields(self, CCbar=False):
         """
         Read fields from nc file
         """
@@ -453,17 +628,9 @@ class AV_netCDF_GUI(MidpointNormalize):
             lat = self.ds['lat'][:]
         
         else:
-            x = self.ds['x'][:]+5600000.0
-            x /= np.amax(x)
-            x *= 360
-            y = self.ds['y'][:]+5200000.
-            y /= np.amax(y)
-            y *= 180
-            y -= 90
-            print('ATTENTION CONVERSION EN lon lat DEGUEULASSE')
-
-            lon = x.copy()
-            lat = y.copy()
+            lon = np.linspace(start=0.0, stop=360., num=720)
+            lat = np.linspace(start=-85.0, stop=85.0, num=360)
+            print('ATTENTION CONVERSION EN lon lat BOF BOF')
 
         if self.fieldname!='mora':
 
@@ -477,7 +644,26 @@ class AV_netCDF_GUI(MidpointNormalize):
                     del self.zvar_units
                 except AttributeError:
                     pass
+
+                # reconstruire les donnees avec atmphys0.f
+                if (not self.AV) and (not CCbar):
+                    lon_atmos = self.ds_atmos['lon'][:]
+                    lat_atmos = self.ds_atmos['lat'][:]
+                    ds_atmos = self.ds_atmos
+                    if self.fieldname=='Tann':
+                        fieldname_atmos = 'ts'
+                    elif self.fieldname=='Acc':
+                        fieldname_atmos = 'pp'
+                    elif self.fieldname=='relhum':
+                        fieldname_atmos = 'r'
+                    rawdata_atmos = self.ds_atmos[fieldname_atmos][:]
+                    if self.fieldname=='Tann':
+                        rawdata_atmos -= 273.15
+                    return lon,lat,rawdata[self.itime,:,:],\
+                           lon_atmos,lat_atmos,rawdata_atmos[self.itime,:,:]
+
                 return lon,lat,rawdata[self.itime,:,:]
+
             elif len(rawdata.shape)==4:
                 maxzvar = rawdata.shape[1]
                 self.zvar_actual = min(self.zvar+1,maxzvar)-1
@@ -603,7 +789,8 @@ class O_netCDF_GUI():
         names,long_names = lc.ReadNames_O(self.filename)
         self.names = names
         self.long_names = long_names
-        self.lb_names = ['{:} ({:})'.format(long_names[i],self.ds[names[i]].units) for i in range(len(names)) if names[i] not in excluded_names]
+        self.lb_names = ['{:} ({:})'.format(long_names[i],self.ds[names[i]].units)
+                for i in range(len(names)) if names[i] not in excluded_names]
 
         maxlen=0
         for name in self.lb_names:
@@ -736,7 +923,6 @@ class O_netCDF_GUI():
         self._ReadParams()
 
         lon,lat,data = self._GetPlotFields()
-
         projectionfun = self.projections[self.Proj_options.index(self.proj)]
         if self.proj=='Orthographic':
             projection = projectionfun(self.clon,self.clat)
@@ -871,6 +1057,8 @@ def GI_netcdf(datapath='.'):
         datapath : string : path where there are the atmym*.nc files.
 
     """    
+    matplotlib.use('TkAgg')
+    matplotlib.interactive('t')
     cwd = os.getcwd()
     os.chdir(datapath)
     window = tk.Tk()

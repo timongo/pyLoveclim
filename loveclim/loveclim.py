@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import matplotlib
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -344,9 +343,13 @@ def ReadNames_AV(filename, AV=True):
                 long_names.append(str(ds.variables[v].long_name))
                 standard_names.append(str(ds.variables[v].standard_name))
     else:
-        for v in ds.variables:
+        DwnsN = ['Surface Temperature', 'Total Precipitation', 'Relative humidity']
+        for n, v in enumerate(ds.variables):
             names.append(str(ds.variables[v].name))
-            long_names.append(str(ds.variables[v].name))
+            if n>2:
+                long_names.append(DwnsN[n-3])
+            else:
+                long_names.append(str(ds.variables[v].name))
 
     return names,long_names,standard_names
 
