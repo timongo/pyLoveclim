@@ -5,10 +5,12 @@ import loveclim as lc
 import netCDF4 as nc
 import cartopy.crs as ccrs
 import cartopy
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, interp2d
+from scipy.ndimage import gaussian_filter
 import os
 import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
 import platform
 if platform.system()=='Darwin':
     matplotlib.use('MacOSX')
@@ -243,6 +245,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.filename_atmos = filename_atmos
         self.path = path
         self.atmospath = atmospath
+        self.oceanpath = os.path.join(self.path, 'ocean.dat')
         # Read data
         self.ds = nc.Dataset(self.filename)
         if not self.AV:
@@ -505,19 +508,26 @@ class AV_netCDF_GUI(MidpointNormalize):
         lon,lat,data = self._GetPlotFields(CCbar=True)
         datmax, datmin = np.amax(data), np.amin(data)
 
+        if not self.AV:
+            elim_zero_K = (data>-270.)
+            datmin = np.amin(data[elim_zero_K])
+
         # update colorbar
         self.CCbar_sb = tk.Spinbox(self.frame,
                                    command=self._Replot,
-                                   from_=datmin,
-                                   to=datmax,
+                                   from_=datmin-1,
+                                   to=datmax+1,
                                    font=self.textfont)
         self.CCbar_sb.bind('<Return>',self._Enter)
         self.CCbar_sb.bind('<KP_Enter>',self._Enter)
+        var = tk.StringVar(self.frame)
+        var.set("{:d}".format(int(datmax+1)))
         self.CCbar_ssb = tk.Spinbox(self.frame,
                                    command=self._Replot,
-                                   from_=datmin,
-                                   to=datmax,
-                                   font=self.textfont)
+                                   from_=datmin-1,
+                                   to=datmax+1,
+                                   font=self.textfont,
+                                   textvariable=var)
         self.CCbar_ssb.bind('<Return>',self._Enter)
         self.CCbar_ssb.bind('<KP_Enter>',self._Enter)
         row = self.CCrow
@@ -535,12 +545,18 @@ class AV_netCDF_GUI(MidpointNormalize):
 
         if self.AV:
             lon,lat,data = self._GetPlotFields()
+            lon,lat,data = self._PeriodicBoundaryConditions(lon,lat,data)
         else:
-            lon,lat,data,lonat,latat,dataat = self._GetPlotFields()
-
-        lon,data = self._PeriodicBoundaryConditions(lon,data)
-        if not self.AV:
-            lonat,dataat = self._PeriodicBoundaryConditions(lonat,dataat)
+            londws,latdws,datadws,lon,lat,data = self._GetPlotFields()
+            londws,latdws,datadws = self._PeriodicBoundaryConditions(londws,latdws,datadws,atmos=False)
+            if not os.path.exists(self.oceanpath):
+                self.detect_ocean(londws, latdws) 
+            lons = lon.size
+            lon_forint = np.linspace(-180., 540., 2*lons)
+            data_forint = np.hstack((data[:,lons//2:], data, data[:,:lons//2]))
+            int_data = interp2d(x=lon_forint, y=lat, z=data_forint)
+            lon = np.linspace(0, 360, londws.size)
+            int_data = np.ma.asarray(int_data(lon, latdws))
 
         projectionfun = self.projections[self.Proj_options.index(self.proj)]
         if self.proj=='Orthographic':
@@ -566,20 +582,52 @@ class AV_netCDF_GUI(MidpointNormalize):
         else:
             vmin = float(self.CCbar_sb.get())
             vmax = float(self.CCbar_ssb.get())
-            if (vmin>vmax):
+            if (vmin>=vmax):
                 vmin, vmax = np.amin(data), np.amax(data)
             cont = max(10,int(self.cont_sb.get()))
-            levels = np.linspace(start=vmin, stop=vmax, num=cont)
-
             cmap = plt.get_cmap('coolwarm')
-            print(np.amin(dataat), np.amax(dataat), np.amin(data), np.amax(data))
-            im = self.ax.contourf(lonat, latat, dataat, levels=levels,
-                                  transform=ccrs.PlateCarree(self.clon),
-                                  cmap=cmap)
+
             if not self.AV:
-                im = self.ax.contourf(lon, lat, data, levels=levels,
-                                      transform=ccrs.PlateCarree(self.clon+180.),
+
+                # load data
+                tmp_atmos = int_data.copy()
+                tmp_dws = datadws.copy()
+
+                # treat land and ocean
+                ocean = np.asarray(np.loadtxt(self.oceanpath), dtype=bool)
+                reste = np.logical_or((tmp_dws<-200.), ocean)
+                tmp_dws[reste] = tmp_atmos[reste]
+
+                # treat extremal vamues
+                tmp_dws[tmp_dws<vmin] = vmin
+                tmp_dws[tmp_dws>vmax] = vmax
+                tmpp_dws = tmp_dws.copy()
+                tmpp_dws[reste] = None
+
+                # lissage et premier plot
+                tmp_dws = gaussian_filter(tmp_dws, sigma=3)
+                levels = np.linspace(start=vmin, stop=vmax, num=cont)
+                im = self.ax.contourf(londws, latdws, tmp_dws, levels=levels,
+                                      transform=ccrs.PlateCarree(self.clon),
                                       cmap=cmap)
+                # contourf
+                im = self.ax.contourf(londws, latdws, tmpp_dws, levels=levels,
+                                      transform=ccrs.PlateCarree(self.clon),
+                                      cmap=cmap)
+            else:
+                # load data
+                tmp_atmos = data.copy()
+
+                # treat extremal vamues
+                tmp_atmos[tmp_atmos<vmin] = None
+                tmp_atmos[tmp_atmos>vmax] = vmax
+                levels = np.linspace(start=vmin, stop=vmax, num=cont)
+
+                # contourf
+                im = self.ax.contourf(lon, lat, tmp_atmos, levels=levels,
+                                      transform=ccrs.PlateCarree(self.clon),
+                                      cmap=cmap)
+ 
         self.cb = plt.colorbar(im)
         self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
         try:
@@ -592,6 +640,18 @@ class AV_netCDF_GUI(MidpointNormalize):
             self.Zvar_var.set('')
         
         self.plotexists = True
+
+    def detect_ocean(self, londws, latdws):
+        ## Get whether the points are on land using Basemap.is_land
+        print('File ocean.dat not found\n making ocean.dat ---> please wait')
+        lon_grid, lat_grid = np.meshgrid(londws,latdws)
+        bm = Basemap(projection='cyl', llcrnrlat=-89.75, urcrnrlat=89.75,
+                     llcrnrlon=-179.75, urcrnrlon=180, resolution='c', area_thresh=100000)
+        f = np.vectorize(bm.is_land)
+        xpt, ypt = bm(lon_grid, lat_grid)
+        basemap_land_mask = f(xpt,ypt)
+        np.savetxt(fname=self.oceanpath, X=np.logical_not(basemap_land_mask))
+        print('File ocean.dat made')
 
     def _Replot(self,dummy=0):
         """
@@ -628,9 +688,8 @@ class AV_netCDF_GUI(MidpointNormalize):
             lat = self.ds['lat'][:]
         
         else:
-            lon = np.linspace(start=0.0, stop=360., num=720)
-            lat = np.linspace(start=-85.0, stop=85.0, num=360)
-            print('ATTENTION CONVERSION EN lon lat BOF BOF')
+            lon = np.linspace(start=-179.75, stop=179.75, num=720)
+            lat = np.linspace(start=-89.75, stop=89.75, num=360)
 
         if self.fieldname!='mora':
 
@@ -683,33 +742,43 @@ class AV_netCDF_GUI(MidpointNormalize):
             rawdata = np.ma.masked_array(data,mask=t2m.mask)
             return lon,lat,rawdata
 
-    def _PeriodicBoundaryConditions(self,lon,data):
+    def _PeriodicBoundaryConditions(self,lon,lat,data,atmos=True):
         """
         Close the data set by setting additional values at the end of the arrays
         """
+        clon = self.clon
+        clat = self.clat
+        if atmos:
+            last = 360.
+        else:
+            last = 180.
 
         # Two possibilities: the mask is an array or it is just equal to False
         if type(data.mask)==np.bool_:
             bc_lon = np.zeros(len(lon)+1)
+            bc_lat = np.zeros(lat.size)
             bc_data = np.zeros((data.shape[0],len(lon)+1))
-            bc_lon[:-1] = lon[:]
-            bc_lon[-1] = 360.
+            bc_lon[:-1] = lon[:]-clon
+            bc_lon[-1] = last-clon
+            bc_lat = lat-clat
             bc_data[:,:-1] = data.data[:,:]
             bc_data[:,-1] = data.data[:,0]
 
-            return bc_lon,np.ma.array(bc_data,mask=False)        
+            return bc_lon,bc_lat,np.ma.array(bc_data,mask=False)        
         else:
             bc_lon = np.zeros(len(lon)+1)
             bc_data = np.zeros((data.shape[0],len(lon)+1))
+            bc_lat = np.zeros(lat.size)
             bc_mask = np.zeros((data.shape[0],len(lon)+1))
-            bc_lon[:-1] = lon[:]
-            bc_lon[-1] = 360.
+            bc_lon[:-1] = lon[:]-clon
+            bc_lon[-1] = last-clon
+            bc_lat = lat-clat
             bc_data[:,:-1] = data.data[:,:]
             bc_mask[:,:-1] = data.mask[:,:]
             bc_data[:,-1] = data.data[:,0]
             bc_mask[:,-1] = data.mask[:,0]
 
-            return bc_lon,np.ma.array(bc_data,mask=bc_mask.astype(bool))
+            return bc_lon,bc_lat,np.ma.array(bc_data,mask=bc_mask.astype(bool))
 
     def _Name(self,long_name):
         """
