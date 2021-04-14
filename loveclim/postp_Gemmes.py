@@ -28,7 +28,7 @@ plt.rc('xtick', labelsize = SMALL_SIZE) # fontsize of the tick labels
 plt.rc('ytick', labelsize = SMALL_SIZE) # fontsize of the tick labels
 plt.rc('legend', fontsize = MEDIUM_SIZE) # legend fontsize
 plt.rc('figure', titlesize = BIGGER_SIZE) # fontsize of the figure title
-mpl.rcParams['lines.linewidth'] = 0.8
+mpl.rcParams['lines.linewidth'] = 1.
 mpl.rcParams['lines.markersize'] = 1.5
 
 ### functions -----------------------------------------------------------------
@@ -123,6 +123,8 @@ def Gemmes_quick_view(namef, path='.', y_ini=2016, y_stop=2100, labels='', retur
             time = dataDict[Np]['time']
             temp = dataDict[Np]['T']
             ind = (time >= 2095)*(time <= 2105)
+            inddd = (time >= 2065)*(time <= 2075)
+            print(np.mean(temp[ind]), np.mean(temp[inddd]))
             labels.append('+{:.1f}°C'.format(np.mean(temp[ind])))
 
 

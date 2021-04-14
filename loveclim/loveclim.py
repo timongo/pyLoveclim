@@ -325,7 +325,6 @@ def ReadGlobals(filename):
 
     return t,Y,D,T
 
-
 def ReadNames_AV(filename, AV=True):
     """
     For Atmos and Vecode

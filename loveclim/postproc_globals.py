@@ -14,6 +14,8 @@ Nbd = 360 # number of days in one year
 # average_yearly_T
 def average_yearly_T(T, ystart=1):
     """
+    Deprecated : Use get_yearly_temp_ghg.
+
     Return the years and the average yearly temperature from a global book file
     from iLOVECLIM.
     
@@ -42,6 +44,33 @@ def average_yearly_T(T, ystart=1):
     
     return years, Tmoy
 
+# get_yearly_temp_ghg 
+def get_yearly_temp_ghg(filename, ystart=1):
+    """
+    Get yearly temperature and ghg from ipcc*
+
+    Parameters:
+        filename : string
+            filename is the path of the ipcc file.
+        ystart : int
+            The number of the first year computed.
+    
+    Returns:
+        t : array like
+            Number of years computed in the iLOVECLIM's simulation.
+        tm : array like
+            Average temperature vector. Same size than years.
+        co2 : array like
+            Average co2 concentration in atmosphere. Same size than years.
+    """
+
+    dat = np.loadtxt(filename)
+    t = dat[:,0]
+    tm = dat[:,2]
+    co2 = dat[:,6]
+
+    return t, tm, co2
+
 # quick_view_T
 def quick_view_T(bookname, path='./', ystart=1):
     """
@@ -60,6 +89,7 @@ def quick_view_T(bookname, path='./', ystart=1):
 
     # mean
     Ym, tmoy = average_yearly_T(T, ystart=ystart)
+    print('je suis la')
 
     # plot
     fig, ax = plt.subplots()
@@ -74,7 +104,3 @@ def quick_view_T(bookname, path='./', ystart=1):
     plt.savefig(namef)
     print(namef)
     plt.close(fig)
-
-
-
-

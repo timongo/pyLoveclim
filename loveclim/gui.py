@@ -7,7 +7,7 @@ import cartopy.crs as ccrs
 import cartopy
 from scipy.interpolate import interp1d, interp2d
 from scipy.ndimage import gaussian_filter
-import os
+import os, sys
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
@@ -39,7 +39,7 @@ class loveclim_GUI:
     Main window
     """
 
-    def __init__(self, master):
+    def __init__(self, master, anomaly=False):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -57,6 +57,7 @@ class loveclim_GUI:
 
         path = os.getcwd()
         self.path = path
+        self.anomaly = anomaly
         # files for atmos
         self.atmospath = os.path.join(path, 'atmos')
         AllFiles = os.listdir(self.atmospath)
@@ -187,7 +188,7 @@ class loveclim_GUI:
         id = self.ncFiles_lb.curselection()
         self.filename = self.ncFiles_lb.get(id)
         self.newWindow = tk.Toplevel(self.master)
-        self.app = AV_netCDF_GUI(self.newWindow,self.filename)
+        self.app = AV_netCDF_GUI(self.newWindow, self.filename)
         os.chdir(self.path)
 
     def D_Open(self):
@@ -201,8 +202,12 @@ class loveclim_GUI:
         id = self.ncFiles_lb2.curselection()
         self.filename = self.ncFiles_lb2.get(id)
         self.newWindow = tk.Toplevel(self.master)
-        self.app = AV_netCDF_GUI(self.newWindow,self.filename, AV=False,
-                filename_atmos=self.filename_atmos,path=self.downspath,atmospath=self.atmospath)
+        self.app = AV_netCDF_GUI(self.newWindow, self.filename,
+                                 AV=False,
+                                 filename_atmos=self.filename_atmos,
+                                 path=self.downspath,
+                                 atmospath=self.atmospath,
+                                 anomaly=self.anomaly)
         os.chdir(self.path)
 
     def O_Open(self):
@@ -221,7 +226,7 @@ class AV_netCDF_GUI(MidpointNormalize):
     GUI for Atmos or Vecode files
     """
     
-    def __init__(self,master,filename,AV=True,filename_atmos='',path='',atmospath=''):
+    def __init__(self,master,filename,AV=True,filename_atmos='',path='',atmospath='',anomaly=False):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -246,6 +251,8 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.path = path
         self.atmospath = atmospath
         self.oceanpath = os.path.join(self.path, 'ocean.dat')
+        self.anomaly = anomaly
+        self.label = 0
         # Read data
         self.ds = nc.Dataset(self.filename)
         if not self.AV:
@@ -350,8 +357,8 @@ class AV_netCDF_GUI(MidpointNormalize):
                                    from_=1,
                                    to=len(self.ds['time'][:]),
                                    font=self.textfont)
-        self.Itime_sb.bind('<Return>',self._Enter)
-        self.Itime_sb.bind('<KP_Enter>',self._Enter)
+        self.Itime_sb.bind('<Return>',self._EnterIZ)
+        self.Itime_sb.bind('<KP_Enter>',self._EnterIZ)
         self.Time_var = tk.StringVar(self.frame)
         self.Time_var.set('')
         self.Time_l = tk.Label(self.frame,
@@ -367,8 +374,8 @@ class AV_netCDF_GUI(MidpointNormalize):
                                    from_=1,
                                    to=4,
                                    font=self.textfont)
-        self.Zvar_sb.bind('<Return>',self._Enter)
-        self.Zvar_sb.bind('<KP_Enter>',self._Enter)
+        self.Zvar_sb.bind('<Return>',self._EnterIZ)
+        self.Zvar_sb.bind('<KP_Enter>',self._EnterIZ)
         self.Zvar_var = tk.StringVar(self.frame)
         self.Zvar_var.set('')
         self.ZvarActual_l = tk.Label(self.frame,
@@ -508,10 +515,6 @@ class AV_netCDF_GUI(MidpointNormalize):
         lon,lat,data = self._GetPlotFields(CCbar=True)
         datmax, datmin = np.amax(data), np.amin(data)
 
-        if not self.AV:
-            elim_zero_K = (data>-270.)
-            datmin = np.amin(data[elim_zero_K])
-
         # update colorbar
         self.CCbar_sb = tk.Spinbox(self.frame,
                                    command=self._Replot,
@@ -542,21 +545,32 @@ class AV_netCDF_GUI(MidpointNormalize):
         """
 
         self._ReadParams()
+        if not self.plotexists:
+    
+            if self.AV:
+                lon,lat,data = self._GetPlotFields()
+                lon,lat,data = self._PeriodicBoundaryConditions(lon,lat,data)
+                self.DATA = [lon, lat, data, data]
+            else:
+                londws,latdws,datadws,lon,lat,data = self._GetPlotFields()
 
-        if self.AV:
-            lon,lat,data = self._GetPlotFields()
-            lon,lat,data = self._PeriodicBoundaryConditions(lon,lat,data)
+                londws,latdws,datadws,lon,lat,int_data = self._Perio_Interp(
+                        londws,latdws,datadws,lon,lat,data)
+
+                # save data
+                self.DATA = [londws, latdws, datadws, lon, lat, int_data]
         else:
-            londws,latdws,datadws,lon,lat,data = self._GetPlotFields()
-            londws,latdws,datadws = self._PeriodicBoundaryConditions(londws,latdws,datadws,atmos=False)
-            if not os.path.exists(self.oceanpath):
-                self.detect_ocean(londws, latdws) 
-            lons = lon.size
-            lon_forint = np.linspace(-180., 540., 2*lons)
-            data_forint = np.hstack((data[:,lons//2:], data, data[:,:lons//2]))
-            int_data = interp2d(x=lon_forint, y=lat, z=data_forint)
-            lon = np.linspace(0, 360, londws.size)
-            int_data = np.ma.asarray(int_data(lon, latdws))
+            if self.AV:
+                lon = self.DATA[0]
+                lat = self.DATA[1]
+                data = self.DATA[2]
+            else:
+                londws = self.DATA[0]
+                latdws = self.DATA[1]
+                datadws = self.DATA[2]
+                lon = self.DATA[3]
+                lat = self.DATA[4]
+                int_data = self.DATA[5]
 
         projectionfun = self.projections[self.Proj_options.index(self.proj)]
         if self.proj=='Orthographic':
@@ -568,7 +582,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         else:
             projection = projectionfun(self.clon)
         
-        self.ax = plt.axes(projection=projection)
+        self.ax = plt.axes(projection=projection, label=self.label)
         self.ax.set_global()
         self.ax.coastlines()
         if self.fieldname=='mora':
@@ -596,22 +610,22 @@ class AV_netCDF_GUI(MidpointNormalize):
                 # treat land and ocean
                 ocean = np.asarray(np.loadtxt(self.oceanpath), dtype=bool)
                 reste = np.logical_or((tmp_dws<-200.), ocean)
-                tmp_dws[reste] = tmp_atmos[reste]
+                tmp_dws[reste] = None #tmp_atmos[reste]
 
                 # treat extremal vamues
-                tmp_dws[tmp_dws<vmin] = vmin
-                tmp_dws[tmp_dws>vmax] = vmax
+                #tmp_dws[tmp_dws<vmin] = vmin
+                #tmp_dws[tmp_dws>vmax] = vmax
                 tmpp_dws = tmp_dws.copy()
-                tmpp_dws[reste] = None
+                #tmpp_dws[reste] = None
 
                 # lissage et premier plot
-                tmp_dws = gaussian_filter(tmp_dws, sigma=3)
                 levels = np.linspace(start=vmin, stop=vmax, num=cont)
-                im = self.ax.contourf(londws, latdws, tmp_dws, levels=levels,
+                #tmp_dws = gaussian_filter(tmp_dws, sigma=3)
+                im = self.ax.contourf(lon-self.clon, lat, tmp_atmos, levels=levels,
                                       transform=ccrs.PlateCarree(self.clon),
                                       cmap=cmap)
                 # contourf
-                im = self.ax.contourf(londws, latdws, tmpp_dws, levels=levels,
+                im = self.ax.contourf(londws-self.clon, latdws, tmp_dws, levels=levels,
                                       transform=ccrs.PlateCarree(self.clon),
                                       cmap=cmap)
             else:
@@ -619,8 +633,8 @@ class AV_netCDF_GUI(MidpointNormalize):
                 tmp_atmos = data.copy()
 
                 # treat extremal vamues
-                tmp_atmos[tmp_atmos<vmin] = None
-                tmp_atmos[tmp_atmos>vmax] = vmax
+                #tmp_atmos[tmp_atmos<vmin] = None
+                #tmp_atmos[tmp_atmos>vmax] = vmax
                 levels = np.linspace(start=vmin, stop=vmax, num=cont)
 
                 # contourf
@@ -639,16 +653,19 @@ class AV_netCDF_GUI(MidpointNormalize):
         except AttributeError:
             self.Zvar_var.set('')
         
+        self.label += 1
         self.plotexists = True
 
     def detect_ocean(self, londws, latdws):
         ## Get whether the points are on land using Basemap.is_land
         print('File ocean.dat not found\n making ocean.dat ---> please wait')
-        lon_grid, lat_grid = np.meshgrid(londws,latdws)
+        lon_grid, lat_grid = np.meshgrid(londws-180.,latdws)
         bm = Basemap(projection='cyl', llcrnrlat=-89.75, urcrnrlat=89.75,
-                     llcrnrlon=-179.75, urcrnrlon=180, resolution='c', area_thresh=100000)
+                     llcrnrlon=-180.0, urcrnrlon=180.0, resolution='c', area_thresh=1)
         f = np.vectorize(bm.is_land)
         xpt, ypt = bm(lon_grid, lat_grid)
+        xpts = xpt.shape[1]
+        xpt = np.hstack((xpt[:,xpts//2:], xpt[:,:xpts//2]))
         basemap_land_mask = f(xpt,ypt)
         np.savetxt(fname=self.oceanpath, X=np.logical_not(basemap_land_mask))
         print('File ocean.dat made')
@@ -678,6 +695,10 @@ class AV_netCDF_GUI(MidpointNormalize):
     def _Enter(self,even):
         self._Replot()
 
+    def _EnterIZ(self,even):
+        self.plotexists = False
+        self._Replot()
+
     def _GetPlotFields(self, CCbar=False):
         """
         Read fields from nc file
@@ -705,7 +726,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                     pass
 
                 # reconstruire les donnees avec atmphys0.f
-                if (not self.AV) and (not CCbar):
+                if (not self.AV):
                     lon_atmos = self.ds_atmos['lon'][:]
                     lat_atmos = self.ds_atmos['lat'][:]
                     ds_atmos = self.ds_atmos
@@ -718,8 +739,11 @@ class AV_netCDF_GUI(MidpointNormalize):
                     rawdata_atmos = self.ds_atmos[fieldname_atmos][:]
                     if self.fieldname=='Tann':
                         rawdata_atmos -= 273.15
-                    return lon,lat,rawdata[self.itime,:,:],\
-                           lon_atmos,lat_atmos,rawdata_atmos[self.itime,:,:]
+                    if CCbar:
+                        return lon_atmos,lat_atmos,rawdata_atmos[self.itime,:,:]
+                    else:
+                        return lon,lat,rawdata[self.itime,:,:],\
+                               lon_atmos,lat_atmos,rawdata_atmos[self.itime,:,:]
 
                 return lon,lat,rawdata[self.itime,:,:]
 
@@ -779,6 +803,29 @@ class AV_netCDF_GUI(MidpointNormalize):
             bc_mask[:,-1] = data.mask[:,0]
 
             return bc_lon,bc_lat,np.ma.array(bc_data,mask=bc_mask.astype(bool))
+
+    def _Perio_Interp(self,londws,latdws,datadws,lon,lat,data):
+
+        # periodic dwns
+        lons = londws.size
+        lon_forint = np.hstack((londws[lons//2:]-360., londws, londws[:lons//2]+360.))
+        data_forint = np.hstack((datadws[:,lons//2:], datadws, datadws[:,:lons//2]))
+        int_data = interp2d(x=lon_forint, y=latdws, z=data_forint)
+        londws = np.linspace(0, 360, londws.size)
+        datadws = np.ma.asarray(int_data(londws, latdws))
+        if not os.path.exists(self.oceanpath):
+            self.detect_ocean(londws, latdws) 
+
+        # periodic original
+        lons = lon.size
+        lon_forint = np.hstack((lon[lons//2:]-360., lon, lon[:lons//2]+360.))
+        data_forint = np.hstack((data[:,lons//2:], data, data[:,:lons//2]))
+        int_data = interp2d(x=lon_forint, y=lat, z=data_forint)
+        lon = np.linspace(0, 360, londws.size)
+        int_data = np.ma.asarray(int_data(lon, lat))
+
+        return londws,latdws,datadws,lon,lat,int_data
+
 
     def _Name(self,long_name):
         """
@@ -1119,7 +1166,7 @@ class O_netCDF_GUI():
         return self.names[self.long_names.index(long_name.split(' (')[0])]
 
 
-def GI_netcdf(datapath='.'):
+def GI_netcdf(datapath='.', anomaly=False):
     """
     Function that launches the Graphics Interface for netcdf outputs.
     PARAMETER:
@@ -1131,7 +1178,7 @@ def GI_netcdf(datapath='.'):
     cwd = os.getcwd()
     os.chdir(datapath)
     window = tk.Tk()
-    gui = loveclim_GUI(window)
+    gui = loveclim_GUI(window, anomaly=anomaly)
     window.mainloop()
     os.chdir(cwd)
 
