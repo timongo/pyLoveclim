@@ -350,6 +350,9 @@ def ReadNames_AV(filename, AV=True):
             else:
                 long_names.append(str(ds.variables[v].name))
 
+    #for i in range(len(names)):
+    #    print(names[i], long_names[i])
+
     return names,long_names,standard_names
 
 def ReadNames_O(filename):

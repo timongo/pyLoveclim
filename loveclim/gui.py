@@ -39,7 +39,7 @@ class loveclim_GUI:
     Main window
     """
 
-    def __init__(self, master, anomaly=False):
+    def __init__(self, master):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -57,7 +57,6 @@ class loveclim_GUI:
 
         path = os.getcwd()
         self.path = path
-        self.anomaly = anomaly
         # files for atmos
         self.atmospath = os.path.join(path, 'atmos')
         AllFiles = os.listdir(self.atmospath)
@@ -207,7 +206,7 @@ class loveclim_GUI:
                                  filename_atmos=self.filename_atmos,
                                  path=self.downspath,
                                  atmospath=self.atmospath,
-                                 anomaly=self.anomaly)
+                                 )
         os.chdir(self.path)
 
     def O_Open(self):
@@ -226,7 +225,7 @@ class AV_netCDF_GUI(MidpointNormalize):
     GUI for Atmos or Vecode files
     """
     
-    def __init__(self,master,filename,AV=True,filename_atmos='',path='',atmospath='',anomaly=False):
+    def __init__(self,master,filename,AV=True,filename_atmos='',path='',atmospath=''):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -251,8 +250,13 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.path = path
         self.atmospath = atmospath
         self.oceanpath = os.path.join(self.path, 'ocean.dat')
-        self.anomaly = anomaly
+        self.anomaly = False
         self.label = 0
+        # old fields values
+        self.oldfieldname = ''
+        self.oldtypeval = ''
+        self.olditime = ''
+
         # Read data
         self.ds = nc.Dataset(self.filename)
         if not self.AV:
@@ -260,10 +264,10 @@ class AV_netCDF_GUI(MidpointNormalize):
             self.ds_atmos = nc.Dataset(self.filename_atmos)
             os.chdir(self.path)
         # Prepare projections
-        self.projections = [ccrs.Orthographic,
+        self.projections = [ccrs.PlateCarree,
+                            ccrs.Orthographic,
                             ccrs.Mercator,
-                            ccrs.Robinson,
-                            ccrs.PlateCarree]
+                            ccrs.Robinson]
         # For Mora-like maps
         Threshold_T = np.array([26.5, 27. , 27.5, 28. , 28.5, 29. , 29.5, 30. , 30.5, 31. , 31.5,
                                 32. , 32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. , 36.5, 37. ,
@@ -297,7 +301,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                                 highlightbackground=exitcolor,
                                 command=self.frame.quit,
                                 font=self.buttonfont)
-
+         
         # List of names to exclude (not fields)
         if self.AV:
             excluded_names = ["lon","lat","time","P_T3","P_T4","P_U3"]
@@ -344,6 +348,7 @@ class AV_netCDF_GUI(MidpointNormalize):
             self.Field_lb.insert(tk.END,name)
         if ('Relative Humidity' in long_names) and ('Temperature at 2 Meter' in long_names):
             self.Field_lb.insert(tk.END,'Mora Deadly Threshold (K)')
+            self.lb_names.append('Temperature above threshold (K)')
         self.Field_lb.selection_set(0)
         self.Field_lb.event_generate("<<ListboxSelect>>")
         self.Field_lb.bind("<<ListboxSelect>>",self._Enter)
@@ -353,7 +358,6 @@ class AV_netCDF_GUI(MidpointNormalize):
                                 text="itime:",
                                 font=self.textfont)
         self.Itime_sb = tk.Spinbox(self.frame,
-                                   command=self._Replot,
                                    from_=1,
                                    to=len(self.ds['time'][:]),
                                    font=self.textfont)
@@ -370,7 +374,6 @@ class AV_netCDF_GUI(MidpointNormalize):
                                text="zvar:",
                                font=self.textfont)
         self.Zvar_sb = tk.Spinbox(self.frame,
-                                   command=self._Replot,
                                    from_=1,
                                    to=4,
                                    font=self.textfont)
@@ -384,7 +387,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         # Projection option menu
         self.Proj_l = tk.Label(self.frame,text = "Projection:",
                                font=self.textfont)
-        self.Proj_options = ["Orthographic","Mercator","Robinson","PlateCarree"]
+        self.Proj_options = ["PlateCarree", "Orthographic","Mercator","Robinson"]
         self.Proj_var = tk.StringVar(self.frame)
         self.Proj_var.set(self.Proj_options[0])
         self.Proj_om = tk.OptionMenu(self.frame,
@@ -431,23 +434,40 @@ class AV_netCDF_GUI(MidpointNormalize):
                                 font=self.textfont)
         self.CCbar_sb = tk.Spinbox(self.frame,
                                    command=self._Replot,
-                                   from_=0,
-                                   to=0,
+                                   values=('auto\ for\ first\ plot'),
                                    font=self.textfont)
         self.CCbar_sb.bind('<Return>',self._Enter)
         self.CCbar_sb.bind('<KP_Enter>',self._Enter)
         self.CCbar_ssb = tk.Spinbox(self.frame,
                                    command=self._Replot,
-                                   from_=0,
-                                   to=0,
+                                   values=('auto\ for\ first\ plot'),
                                    font=self.textfont)
         self.CCbar_ssb.bind('<Return>',self._Enter)
         self.CCbar_ssb.bind('<KP_Enter>',self._Enter)
-        self.CCPlot = tk.Button(self.frame,text="Load Colorbar",
-                                bg=green,
-                                highlightbackground=green,
-                                font=self.buttonfont,
-                                command=self.load_CC)
+
+        # absolute or relatives values
+        self.RItime_l = tk.Label(self.frame,
+                                text="itime preind:",
+                                font=self.textfont)
+        self.RItime_sb = tk.Spinbox(self.frame,
+                                   from_=1,
+                                   to=len(self.ds['time'][:]),
+                                   font=self.textfont)
+        self.RItime_sb.bind('<Return>',self._EnterIZ)
+        self.RItime_sb.bind('<KP_Enter>',self._EnterIZ)
+        self.Time_var = tk.StringVar(self.frame)
+        self.Time_var.set('')
+        self.Time_l = tk.Label(self.frame,
+                                textvariable=self.Time_var,
+                                font=self.textfont)
+        self.Typeval_l = tk.Label(self.frame,
+                                  text="Type values:",
+                                  font=self.textfont)
+        self.Typeval = tk.Spinbox(self.frame,
+                                   values=('absolute', 'anomaly'),
+                                   font=self.textfont)
+        self.Typeval.bind('<Return>',self._Enter)
+        self.Typeval.bind('<KP_Enter>',self._Enter)
 
         # nb contour
         self.cont_l = tk.Label(self.frame,
@@ -494,7 +514,11 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.CCbar_l2.grid(row=row,column=2,sticky="e")
         self.CCbar_ssb.grid(row=row,column=3,sticky="w")
         row = row+1
-        self.CCPlot.grid(row=row,column=2,columnspan=3,sticky="ew")
+        self.Typeval_l.grid(row=row,column=2,sticky="e")
+        self.Typeval.grid(row=row,column=3,sticky="w")
+        row += 1
+        self.RItime_l.grid(row=row,column=2,sticky="e")
+        self.RItime_sb.grid(row=row,column=3,sticky="w")
         row=row+1
         self.cont_l.grid(row=row,column=2,sticky="e")
         self.cont_sb.grid(row=row,column=3,sticky="w")
@@ -506,20 +530,16 @@ class AV_netCDF_GUI(MidpointNormalize):
         row=row+1
         self.Quit_b.grid(row=row,column=2,columnspan=3,sticky="ew")
 
-    def load_CC(self):
+    def load_CC(self, datmin, datmax):
         """
         loqd colorbar values
         """
-        # load values
-        self._ReadParams()
-        lon,lat,data = self._GetPlotFields(CCbar=True)
-        datmax, datmin = np.amax(data), np.amin(data)
-
         # update colorbar
         self.CCbar_sb = tk.Spinbox(self.frame,
                                    command=self._Replot,
-                                   from_=datmin-1,
-                                   to=datmax+1,
+                                   from_=datmin,
+                                   to=datmax,
+                                   increment=0.01,
                                    font=self.textfont)
         self.CCbar_sb.bind('<Return>',self._Enter)
         self.CCbar_sb.bind('<KP_Enter>',self._Enter)
@@ -527,8 +547,9 @@ class AV_netCDF_GUI(MidpointNormalize):
         var.set("{:d}".format(int(datmax+1)))
         self.CCbar_ssb = tk.Spinbox(self.frame,
                                    command=self._Replot,
-                                   from_=datmin-1,
-                                   to=datmax+1,
+                                   from_=datmin,
+                                   to=datmax,
+                                   increment=0.01,
                                    font=self.textfont,
                                    textvariable=var)
         self.CCbar_ssb.bind('<Return>',self._Enter)
@@ -537,112 +558,87 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.CCbar_sb.grid(row=row,column=3,sticky="w")
         row = row+1
         self.CCbar_ssb.grid(row=row,column=3,sticky="w")
- 
+
+    def _Preplot(self):
+        londws, latdws, datadws = [], [], []
+        if not self.plotexists:
+            if self.AV:
+                lon,lat,data = self._GetPlotFields()
+                lon,lat,data = self._PeriodicBoundaryConditions(lon,lat,data)
+            else:
+                # loading data
+                londws,latdws,datadws,lon,lat,data = self._GetPlotFields(self.typeval)
+
+                # interp data
+                lon,lat,data = self._Perio_Interp(londws,latdws,datadws,lon,lat,data)
+
+            # save data
+            self.DATA = [lon, lat, data]
+        else:
+            lon = self.DATA[0]
+            lat = self.DATA[1]
+            data = self.DATA[2]
+
+        return lon,lat,data
 
     def _Plot(self):
         """
         Plot using options
         """
-
+        # load data
         self._ReadParams()
-        if not self.plotexists:
-    
-            if self.AV:
-                lon,lat,data = self._GetPlotFields()
-                lon,lat,data = self._PeriodicBoundaryConditions(lon,lat,data)
-                self.DATA = [lon, lat, data, data]
-            else:
-                londws,latdws,datadws,lon,lat,data = self._GetPlotFields()
+        lon,lat,data = self._Preplot()
 
-                londws,latdws,datadws,lon,lat,int_data = self._Perio_Interp(
-                        londws,latdws,datadws,lon,lat,data)
-
-                # save data
-                self.DATA = [londws, latdws, datadws, lon, lat, int_data]
-        else:
-            if self.AV:
-                lon = self.DATA[0]
-                lat = self.DATA[1]
-                data = self.DATA[2]
-            else:
-                londws = self.DATA[0]
-                latdws = self.DATA[1]
-                datadws = self.DATA[2]
-                lon = self.DATA[3]
-                lat = self.DATA[4]
-                int_data = self.DATA[5]
-
+        # projection
         projectionfun = self.projections[self.Proj_options.index(self.proj)]
         if self.proj=='Orthographic':
             projection = projectionfun(self.clon,self.clat)
         elif self.proj=='Mercator':
-            projection = projectionfun(central_longitude=self.clon,
-                                       min_latitude=-80,
+            projection = projectionfun(central_longitude=self.clon, min_latitude=-80,
                                        max_latitude=84)
         else:
             projection = projectionfun(self.clon)
-        
         self.ax = plt.axes(projection=projection, label=self.label)
         self.ax.set_global()
         self.ax.coastlines()
-        if self.fieldname=='mora':
-            cmap = plt.get_cmap('bwr')
-            im = self.ax.contourf(lon, lat, data,50,
-                                  transform=ccrs.PlateCarree(),
-                                  cmap=cmap,
-                                  vmin=data.min(),
-                                  vmax=data.max(),
-                                  norm=MidpointNormalize(data.min(),data.max(),0.))
+        bodr = cartopy.feature.NaturalEarthFeature(category='cultural',
+            name='admin_0_boundary_lines_land', scale='50m', facecolor='none', alpha=0.7)
+        self.ax.add_feature(bodr, linestyle='--', edgecolor='k', alpha=1)
+
+        # colorbar
+        if self.plotexists:
+            try:
+                vmin = float(self.CCbar_sb.get())
+                vmax = float(self.CCbar_ssb.get())
+            except ValueError:
+                    vmin, vmax = (np.amin(data)), (np.amax(data))
+                    self.load_CC(vmin, vmax)
         else:
-            vmin = float(self.CCbar_sb.get())
-            vmax = float(self.CCbar_ssb.get())
-            if (vmin>=vmax):
-                vmin, vmax = np.amin(data), np.amax(data)
-            cont = max(10,int(self.cont_sb.get()))
-            cmap = plt.get_cmap('coolwarm')
+            vmin, vmax = (np.amin(data)), (np.amax(data))
+            self.load_CC(vmin, vmax)
+        if (vmin>=vmax):
+            vmin, vmax = (np.amin(data)), (np.amax(data))
+        cont = max(10,int(self.cont_sb.get()))
+        cmap = plt.get_cmap('coolwarm')
+        levels = np.linspace(start=vmin, stop=vmax, num=cont)
 
-            if not self.AV:
-
-                # load data
-                tmp_atmos = int_data.copy()
-                tmp_dws = datadws.copy()
-
-                # treat land and ocean
-                ocean = np.asarray(np.loadtxt(self.oceanpath), dtype=bool)
-                reste = np.logical_or((tmp_dws<-200.), ocean)
-                tmp_dws[reste] = None #tmp_atmos[reste]
-
-                # treat extremal vamues
-                #tmp_dws[tmp_dws<vmin] = vmin
-                #tmp_dws[tmp_dws>vmax] = vmax
-                tmpp_dws = tmp_dws.copy()
-                #tmpp_dws[reste] = None
-
-                # lissage et premier plot
-                levels = np.linspace(start=vmin, stop=vmax, num=cont)
-                #tmp_dws = gaussian_filter(tmp_dws, sigma=3)
-                im = self.ax.contourf(lon-self.clon, lat, tmp_atmos, levels=levels,
-                                      transform=ccrs.PlateCarree(self.clon),
-                                      cmap=cmap)
-                # contourf
-                im = self.ax.contourf(londws-self.clon, latdws, tmp_dws, levels=levels,
-                                      transform=ccrs.PlateCarree(self.clon),
-                                      cmap=cmap)
-            else:
-                # load data
-                tmp_atmos = data.copy()
-
-                # treat extremal vamues
-                #tmp_atmos[tmp_atmos<vmin] = None
-                #tmp_atmos[tmp_atmos>vmax] = vmax
-                levels = np.linspace(start=vmin, stop=vmax, num=cont)
-
-                # contourf
-                im = self.ax.contourf(lon, lat, tmp_atmos, levels=levels,
-                                      transform=ccrs.PlateCarree(self.clon),
-                                      cmap=cmap)
+        # plot
+        # load data
+        tmp_atmos = data.copy()
+        tmp_atmos[tmp_atmos<vmin] = vmin
+        tmp_atmos[tmp_atmos>vmax] = vmax
  
+        # contourf
+        im = self.ax.contourf(lon-self.clon, lat-self.clat, tmp_atmos, levels=levels,
+                              transform=ccrs.PlateCarree(self.clon),
+                              cmap=cmap)
+ 
+        # post process image
         self.cb = plt.colorbar(im)
+        label = self.lb_names[self.Field_lb.curselection()[0]]
+        if self.anomaly:
+            label += ' (anomaly)'
+        self.cb.ax.set_ylabel(label)
         self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
         try:
             self.Zvar_var.set('{:} @ {:} = {:d} {:}'.format(
@@ -653,12 +649,14 @@ class AV_netCDF_GUI(MidpointNormalize):
         except AttributeError:
             self.Zvar_var.set('')
         
+        # end of function
         self.label += 1
         self.plotexists = True
 
     def detect_ocean(self, londws, latdws):
         ## Get whether the points are on land using Basemap.is_land
         print('File ocean.dat not found\n making ocean.dat ---> please wait')
+        print(' this may take a few minutes...')
         lon_grid, lat_grid = np.meshgrid(londws-180.,latdws)
         bm = Basemap(projection='cyl', llcrnrlat=-89.75, urcrnrlat=89.75,
                      llcrnrlon=-180.0, urcrnrlon=180.0, resolution='c', area_thresh=1)
@@ -676,21 +674,28 @@ class AV_netCDF_GUI(MidpointNormalize):
         Otherwise, recall Plot
         dummy is a the scale argument (nslide or iphi)
         """
-
-        # check for figure 1
-        if self.plotexists:
-            self.ax.clear()
-            self.cb.remove()
-            self._Plot()
+        self._Plot()
 
     def _ReadParams(self):
 
+        # variables that need a new data load
         self.fieldname = self._Name(self.Field_lb.get(self.Field_lb.curselection()))
         self.itime = int(self.Itime_sb.get())-1
+        self.anomaly = self.Typeval.get()=='anomaly'
+        self.typeval = self.anomaly
+        self.plotexists = (self.oldfieldname==self.fieldname) and (self.olditime==self.itime) \
+                and (self.oldtypeval==self.typeval)
+        if not self.plotexists:
+            self.oldfieldname = self.fieldname
+            self.olditime = self.itime
+            self.oldtypeval = self.typeval
+
+        # variables with same data
         self.zvar = int(self.Zvar_sb.get())-1
         self.proj = self.Proj_var.get()
         self.clon = float(self.Clon_s.get())
         self.clat = float(self.Clat_s.get())
+        self.Ritime = int(self.RItime_sb.get())-1
 
     def _Enter(self,even):
         self._Replot()
@@ -699,7 +704,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.plotexists = False
         self._Replot()
 
-    def _GetPlotFields(self, CCbar=False):
+    def _GetPlotFields(self, anomaly=False):
         """
         Read fields from nc file
         """
@@ -712,59 +717,69 @@ class AV_netCDF_GUI(MidpointNormalize):
             lon = np.linspace(start=-179.75, stop=179.75, num=720)
             lat = np.linspace(start=-89.75, stop=89.75, num=360)
 
-        if self.fieldname!='mora':
-
-            rawdata = self.ds[self.fieldname][:]
-            fieldvar = self.ds[self.fieldname]
-
-            if len(rawdata.shape)==3:
-                try:
-                    del self.zvar_longname
-                    del self.zvar_val
-                    del self.zvar_units
-                except AttributeError:
-                    pass
-
-                # reconstruire les donnees avec atmphys0.f
-                if (not self.AV):
-                    lon_atmos = self.ds_atmos['lon'][:]
-                    lat_atmos = self.ds_atmos['lat'][:]
-                    ds_atmos = self.ds_atmos
-                    if self.fieldname=='Tann':
-                        fieldname_atmos = 'ts'
-                    elif self.fieldname=='Acc':
-                        fieldname_atmos = 'pp'
-                    elif self.fieldname=='relhum':
-                        fieldname_atmos = 'r'
-                    rawdata_atmos = self.ds_atmos[fieldname_atmos][:]
-                    if self.fieldname=='Tann':
-                        rawdata_atmos -= 273.15
-                    if CCbar:
-                        return lon_atmos,lat_atmos,rawdata_atmos[self.itime,:,:]
-                    else:
-                        return lon,lat,rawdata[self.itime,:,:],\
-                               lon_atmos,lat_atmos,rawdata_atmos[self.itime,:,:]
-
-                return lon,lat,rawdata[self.itime,:,:]
-
-            elif len(rawdata.shape)==4:
-                maxzvar = rawdata.shape[1]
-                self.zvar_actual = min(self.zvar+1,maxzvar)-1
-                self.zvar_longname = self.ds[fieldvar.dimensions[1]].long_name
-                self.zvar_val = self.ds[fieldvar.dimensions[1]][self.zvar_actual]
-                self.zvar_units = self.ds[fieldvar.dimensions[1]].units
-                return lon,lat,rawdata[self.itime,self.zvar_actual,:,:]
-
-        else:
+        if self.fieldname=='mora':
             # Temperature at 2 meters in degree C
             t2m = self.ds['t2m'][:][self.itime,:,:]-273.15
             # relative humidity (in percentage)
             rh = self.ds['r'][:][self.itime,:,:]*100
-            # we take the maximum of the data and 0 (actually -.1 to always have something to plot)
+            # take the maximum of the data and 0 (actually -.1 to always have something to plot)
             # in order to emphasize the above threshold part of the data
             data = np.maximum(t2m.data - self.MoraDeadlyThreshold(rh.data),-1.)
+            data = t2m.data - self.MoraDeadlyThreshold(rh.data)
+
             rawdata = np.ma.masked_array(data,mask=t2m.mask)
             return lon,lat,rawdata
+
+
+        rawdata = self.ds[self.fieldname][:]
+        fieldvar = self.ds[self.fieldname]
+
+        if len(rawdata.shape)==3:
+            try:
+                del self.zvar_longname
+                del self.zvar_val
+                del self.zvar_units
+            except AttributeError:
+                pass
+
+            # reconstruire les donnees avec atmphys0.f
+            if self.AV:
+                return lon,lat,rawdata[self.itime,:,:]
+
+            else:
+                # loat atmos data
+                lon_atmos = self.ds_atmos['lon'][:]
+                lat_atmos = self.ds_atmos['lat'][:]
+                ds_atmos = self.ds_atmos
+                if self.fieldname=='Tann':
+                    fieldname_atmos = 'ts'
+                elif self.fieldname=='Acc':
+                    fieldname_atmos = 'pp'
+                elif self.fieldname=='relhum':
+                    fieldname_atmos = 'r'
+                rawdata_atmos = self.ds_atmos[fieldname_atmos][:]
+                if self.fieldname=='Tann':
+                    rawdata_atmos -= 273.15
+
+                # if anomaly
+                if anomaly:
+                    rawdata = rawdata[self.itime,:,:] - rawdata[self.Ritime,:,:]
+                    rawdata_atmos = rawdata_atmos[self.itime,:,:] - rawdata_atmos[self.Ritime,:,:]
+                else:
+                    rawdata = rawdata[self.itime,:,:]
+                    rawdata_atmos = rawdata_atmos[self.itime,:,:]
+
+                return lon,lat,rawdata,lon_atmos,lat_atmos,rawdata_atmos
+
+        elif len(rawdata.shape)==4:
+            maxzvar = rawdata.shape[1]
+            self.zvar_actual = min(self.zvar+1,maxzvar)-1
+            self.zvar_longname = self.ds[fieldvar.dimensions[1]].long_name
+            self.zvar_val = self.ds[fieldvar.dimensions[1]][self.zvar_actual]
+            self.zvar_units = self.ds[fieldvar.dimensions[1]].units
+
+            return lon,lat,rawdata[self.itime,self.zvar_actual,:,:]
+
 
     def _PeriodicBoundaryConditions(self,lon,lat,data,atmos=True):
         """
@@ -813,18 +828,30 @@ class AV_netCDF_GUI(MidpointNormalize):
         int_data = interp2d(x=lon_forint, y=latdws, z=data_forint)
         londws = np.linspace(0, 360, londws.size)
         datadws = np.ma.asarray(int_data(londws, latdws))
+
+        # oceans
         if not os.path.exists(self.oceanpath):
             self.detect_ocean(londws, latdws) 
 
         # periodic original
         lons = lon.size
+        # make a line above and under the map for poles
+        lat_forint = np.hstack(([-90], lat, [90]))
         lon_forint = np.hstack((lon[lons//2:]-360., lon, lon[:lons//2]+360.))
-        data_forint = np.hstack((data[:,lons//2:], data, data[:,:lons//2]))
-        int_data = interp2d(x=lon_forint, y=lat, z=data_forint)
+        data_forint = np.vstack((data[0,:], data, data[-1,:]))
+        data_forint = np.hstack((data_forint[:,lons//2:], data_forint, data_forint[:,:lons//2]))
+        int_data = interp2d(x=lon_forint, y=lat_forint, z=data_forint)
         lon = np.linspace(0, 360, londws.size)
+        lat = np.linspace(-90, 90, latdws.size)
         int_data = np.ma.asarray(int_data(lon, lat))
 
-        return londws,latdws,datadws,lon,lat,int_data
+        # treat land and ocean
+        ocean = np.asarray(np.loadtxt(self.oceanpath), dtype=bool)
+        outland = datadws<np.amin(int_data)
+        ocean = np.logical_or(ocean, outland)
+        datadws[ocean] = int_data[ocean]
+
+        return londws,latdws,datadws
 
 
     def _Name(self,long_name):
@@ -837,6 +864,30 @@ class AV_netCDF_GUI(MidpointNormalize):
         else:
             return self.names[self.long_names.index(long_name.split(' (')[0])]
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ocean
 class O_netCDF_GUI():
     """
     GUI for Ocean files
@@ -1166,7 +1217,7 @@ class O_netCDF_GUI():
         return self.names[self.long_names.index(long_name.split(' (')[0])]
 
 
-def GI_netcdf(datapath='.', anomaly=False):
+def GI_netcdf(datapath='.'):
     """
     Function that launches the Graphics Interface for netcdf outputs.
     PARAMETER:
@@ -1178,7 +1229,7 @@ def GI_netcdf(datapath='.', anomaly=False):
     cwd = os.getcwd()
     os.chdir(datapath)
     window = tk.Tk()
-    gui = loveclim_GUI(window, anomaly=anomaly)
+    gui = loveclim_GUI(window)
     window.mainloop()
     os.chdir(cwd)
 
