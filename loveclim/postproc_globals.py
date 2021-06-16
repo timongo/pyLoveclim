@@ -45,7 +45,7 @@ def average_yearly_T(T, ystart=1):
     return years, Tmoy
 
 # get_yearly_temp_ghg 
-def get_yearly_temp_ghg(filename, ystart=1):
+def get_yearly_temp_ghg(filename, ystart=1, maxrows=0):
     """
     Get yearly temperature and ghg from ipcc*
 
@@ -54,6 +54,8 @@ def get_yearly_temp_ghg(filename, ystart=1):
             filename is the path of the ipcc file.
         ystart : int
             The number of the first year computed.
+        maxrows : int
+            Maximun number of rows in file for loading
     
     Returns:
         t : array like
@@ -64,7 +66,10 @@ def get_yearly_temp_ghg(filename, ystart=1):
             Average co2 concentration in atmosphere. Same size than years.
     """
 
-    dat = np.loadtxt(filename)
+    if maxrows>0:
+        dat = np.loadtxt(filename, max_rows=maxrows)
+    else:
+        dat = np.loadtxt(filename)
     t = dat[:,0]
     tm = dat[:,2]
     co2 = dat[:,6]

@@ -568,7 +568,6 @@ class AV_netCDF_GUI(MidpointNormalize):
             else:
                 # loading data
                 londws,latdws,datadws,lon,lat,data = self._GetPlotFields(self.typeval)
-
                 # interp data
                 lon,lat,data = self._Perio_Interp(londws,latdws,datadws,lon,lat,data)
 
@@ -761,13 +760,28 @@ class AV_netCDF_GUI(MidpointNormalize):
                 if self.fieldname=='Tann':
                     rawdata_atmos -= 273.15
 
+                # select times on 31 years
+                maxtime = rawdata.shape[0]
+                amaxtime = rawdata_atmos.shape[0]
+                itime = self.itime
+                Ritime = self.Ritime
+                lb, up, mm = self.ibounds(itime, maxtime)
+                lba, upa, mma = self.ibounds(Ritime, amaxtime)
+
                 # if anomaly
                 if anomaly:
-                    rawdata = rawdata[self.itime,:,:] - rawdata[self.Ritime,:,:]
-                    rawdata_atmos = rawdata_atmos[self.itime,:,:] - rawdata_atmos[self.Ritime,:,:]
+                    rawdata = rawdata[itime-lb:itime+up,:,:] - \
+                              rawdata[Ritime-lba:Ritime+upa,:,:]
+                    rawdata_atmos = \
+                              rawdata_atmos[itime-lb:itime+up,:,:] - \
+                              rawdata_atmos[Ritime-lba:Ritime+upa,:,:]
                 else:
-                    rawdata = rawdata[self.itime,:,:]
-                    rawdata_atmos = rawdata_atmos[self.itime,:,:]
+                    rawdata = rawdata[itime-lb:itime+up,:,:]
+                    rawdata_atmos = rawdata_atmos[itime-lb:itime+up,:,:]
+
+                # mean data over 31 years
+                rawdata = np.mean(a=rawdata, axis=0)
+                rawdata_atmos = np.mean(a=rawdata_atmos, axis=0)
 
                 return lon,lat,rawdata,lon_atmos,lat_atmos,rawdata_atmos
 
@@ -780,6 +794,20 @@ class AV_netCDF_GUI(MidpointNormalize):
 
             return lon,lat,rawdata[self.itime,self.zvar_actual,:,:]
 
+    def ibounds(self, itime, maxtime):
+        if (itime-15)>=0:
+            if (itime+15)<=maxtime: 
+                lb, up = 15, 15
+            else:
+                lb, up = 15, (maxtime-itime)
+        else:
+            if (itime+15)<=maxtime: 
+                lb, up = itime, 15
+            else:
+                lb, up = itime, (maxtime-itime)
+        mm = (up+lb+1)
+
+        return lb, up, mm
 
     def _PeriodicBoundaryConditions(self,lon,lat,data,atmos=True):
         """
