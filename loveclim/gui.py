@@ -618,7 +618,10 @@ class AV_netCDF_GUI(MidpointNormalize):
         if (vmin>=vmax):
             vmin, vmax = (np.amin(data)), (np.amax(data))
         cont = max(10,int(self.cont_sb.get()))
-        cmap = plt.get_cmap('coolwarm')
+        if not self.fieldname=='mora':
+            cmap = plt.get_cmap('coolwarm')
+        else:
+            cmap = plt.get_cmap('Greys')
         levels = np.linspace(start=vmin, stop=vmax, num=cont)
 
         # plot
