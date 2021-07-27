@@ -80,7 +80,7 @@ class loveclim_GUI:
         lcfiles2.sort()
         nlc2 = len(lcfiles2)
         os.chdir(path)
- 
+
         if nlc!=0:
             # Loveclim Atmos (A) of Vecode (V) files
             self.AV_Open_b = tk.Button(self.frame,text="Open selected\n Atmos or Vecode File",
@@ -173,12 +173,12 @@ class loveclim_GUI:
         if nlc2!=0:
             self.ncFiles_lb2.grid(row=2,rowspan=1,column=0,sticky="ew")
         self.scrollbar.grid(row=0,rowspan=1,column=1,sticky="wsn")
-        self.AV_Open_b.grid(row=0,column=2)
-        self.O_Open_b.grid(row=1,column=2)
+        if nlc!=0:
+            self.AV_Open_b.grid(row=0,column=2)
+        if nlc3!=0:
+            self.O_Open_b.grid(row=1,column=2)
         if nlc2!=0:
             self.D_Open_b.grid(row=2,column=2)
-        self.Quit_b.grid(row=3,column=2)
-            
 
     def AV_Open(self):
         """
