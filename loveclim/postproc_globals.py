@@ -6,6 +6,8 @@ Functions for post-processing the globals data like mean T.
 from loveclim.loveclim import np, ReadGlobals
 from loveclim.postp_Gemmes import plt
 from scipy.ndimage import gaussian_filter1d as gf1d
+import os, sys
+from shutil import copy2
 
 ### Constants
 Nbd = 360 # number of days in one year
@@ -109,3 +111,41 @@ def quick_view_T(bookname, path='./', ystart=1):
     plt.savefig(namef)
     print(namef)
     plt.close(fig)
+
+def copy_restart(path, oldyear, newyear):
+    """
+    The function copy_restart can be used to change the starting year 
+    of a iloveclem restart set of files.
+    Inputs:
+        path : string : path where there is the ic****** dir to copy
+        oldyear : string of len=6 : old year of restart 
+        newyear : string of len=6 : new year of restar
+    """
+    fnames = ['res_masks*.om', 'res*.om', 'inatphy*.dat',
+              'inatdyn*.dat', 'inland*.dat', 'incoup*.dat']
+    oldpath = os.getcwd()
+    os.chdir(path)
+    # tests
+    try:
+        test = int(oldyear)
+        test = int(newyear)
+        if (len(oldyear)!=6)or(len(newyear)!=6):
+            raise ValueError("Nombre d'ints")
+        os.chdir('ic{}'.format(oldyear))
+        os.chdir('..')
+    except ValueError:
+        print('Both oldyear and newyear must be string of 6 integers')
+        print('Examples: 003000, 012345, 001750')
+        sys.exit()
+    except FileNotFoundError:
+        os.chdir(oldpath)
+        raise FileNotFoundError(
+            'Restart with oldyear {} does not exist'.format(oldyear))
+
+    # copy
+    os.system('cp -r ic{} ic{}'.format(oldyear, newyear))
+    os.chdir('ic{}'.format(newyear))
+    for n, f in enumerate(fnames):
+        os.rename(f.replace('*', oldyear), f.replace('*', newyear))
+        print(f)
+    os.chdir(oldpath)

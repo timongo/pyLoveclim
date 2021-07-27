@@ -175,7 +175,8 @@ class loveclim_GUI:
         self.scrollbar.grid(row=0,rowspan=1,column=1,sticky="wsn")
         self.AV_Open_b.grid(row=0,column=2)
         self.O_Open_b.grid(row=1,column=2)
-        self.D_Open_b.grid(row=2,column=2)
+        if nlc2!=0:
+            self.D_Open_b.grid(row=2,column=2)
         self.Quit_b.grid(row=3,column=2)
             
 
