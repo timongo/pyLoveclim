@@ -18,6 +18,9 @@ if platform.system()=='Darwin':
 exitcolor = "#df0101"
 green = "#9afe2e"
 blue = "#33adff"
+KtoC = 273.15
+moy_preind_Mora = 13.75
+moy_preind_iloveclim_SSP = 17.30
 
 # set the colormap and centre the colorbar
 class MidpointNormalize(matplotlib.colors.Normalize):
@@ -274,17 +277,19 @@ class AV_netCDF_GUI(MidpointNormalize):
                                 32. , 32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. , 36.5, 37. ,
                                 37.5, 38. , 38.5, 39. , 39.5, 40. , 40.5, 41. , 41.5, 42. , 42.5,
                                 43. , 43.5, 44. , 44.5, 45. , 45.5, 46. , 46.5, 47. , 47.5, 48. ,
-                                48.5])
+                                48.5, 50.0])
+        Threshold_T -= moy_preind_Mora # Mora threshold is in anomaly
         Threshold_H = np.array([100.109,  89.015,  82.441,  76.078,  71.895,  67.712,  63.529,
                                 59.493,  57.152,  54.812,  52.471,  50.131,  47.79 ,  45.449,
                                 43.109,  40.807,  39.081,  37.355,  35.628,  33.902,  32.175,
                                 30.449,  28.723,  26.996,  25.291,  24.016,  22.741,  21.466,
                                 20.191,  18.916,  17.641,  16.366,  15.091,  13.817,  12.55 ,
                                 11.614,  10.678,   9.742,   8.805,   7.869,   6.933,   5.997,
-                                5.06 ,   4.124,   3.188])
+                                5.06 ,   4.124,   3.188, 0.000])
         # the following function gives the temperature deadly threshold 
         # as a function of the local relative humidity
         self.MoraDeadlyThreshold = interp1d(Threshold_H,Threshold_T)
+
         # Setup GUI
         self._SetupGui()
 
@@ -347,7 +352,11 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.scrollbar.config(command=self.Field_lb.yview)
         for name in self.lb_names:
             self.Field_lb.insert(tk.END,name)
-        if ('Relative Humidity' in long_names) and ('Temperature at 2 Meter' in long_names):
+         
+        # Mora
+        self.tmp_Mora1 = ('Relative Humidity' in long_names)and('Temperature at 2 Meter' in long_names)
+        self.tmp_Mora2 = ('Relative Humidity' in long_names)and('Surface Temperature' in long_names)
+        if self.tmp_Mora1 or self.tmp_Mora2:
             self.Field_lb.insert(tk.END,'Mora Deadly Threshold (K)')
             self.lb_names.append('Temperature above threshold (K)')
         self.Field_lb.selection_set(0)
@@ -355,13 +364,14 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.Field_lb.bind("<<ListboxSelect>>",self._Enter)
             
         # itime spinbox
-        self.Itime_l = tk.Label(self.frame,
-                                text="itime:",
-                                font=self.textfont)
+        maxi_itime = len(self.ds['time'][:])
         self.Itime_sb = tk.Spinbox(self.frame,
                                    from_=1,
-                                   to=len(self.ds['time'][:]),
+                                   to=maxi_itime,
                                    font=self.textfont)
+        self.Itime_l = tk.Label(self.frame,
+                                text="itime: (max {:d})".format(maxi_itime),
+                                font=self.textfont)
         self.Itime_sb.bind('<Return>',self._EnterIZ)
         self.Itime_sb.bind('<KP_Enter>',self._EnterIZ)
         self.Time_var = tk.StringVar(self.frame)
@@ -619,10 +629,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         if (vmin>=vmax):
             vmin, vmax = (np.amin(data)), (np.amax(data))
         cont = max(10,int(self.cont_sb.get()))
-        if not self.fieldname=='mora':
-            cmap = plt.get_cmap('coolwarm')
-        else:
-            cmap = plt.get_cmap('Greys')
+        cmap = plt.get_cmap('coolwarm')
         levels = np.linspace(start=vmin, stop=vmax, num=cont)
 
         # plot
@@ -721,13 +728,17 @@ class AV_netCDF_GUI(MidpointNormalize):
             lat = np.linspace(start=-89.75, stop=89.75, num=360)
 
         if self.fieldname=='mora':
-            # Temperature at 2 meters in degree C
-            t2m = self.ds['t2m'][:][self.itime,:,:]-273.15
+            if self.tmp_Mora1:
+                # Temperature at 2 meters in degree C
+                t2m = self.ds['t2m'][:][self.itime,:,:]-KtoC
+            elif self.tmp_Mora2:
+                t2m = self.ds['ts'][:][self.itime,:,:]-KtoC
             # relative humidity (in percentage)
             rh = self.ds['r'][:][self.itime,:,:]*100
-            # take the maximum of the data and 0 (actually -.1 to always have something to plot)
-            # in order to emphasize the above threshold part of the data
-            data = np.maximum(t2m.data - self.MoraDeadlyThreshold(rh.data),-1.)
+
+            t2m -= moy_preind_iloveclim_SSP # iLoveclim is in anomaly
+
+            # compute threshold
             data = t2m.data - self.MoraDeadlyThreshold(rh.data)
 
             rawdata = np.ma.masked_array(data,mask=t2m.mask)
@@ -738,6 +749,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         fieldvar = self.ds[self.fieldname]
 
         if len(rawdata.shape)==3:
+
             try:
                 del self.zvar_longname
                 del self.zvar_val
@@ -762,7 +774,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                     fieldname_atmos = 'r'
                 rawdata_atmos = self.ds_atmos[fieldname_atmos][:]
                 if self.fieldname=='Tann':
-                    rawdata_atmos -= 273.15
+                    rawdata_atmos -= KtoC
 
                 # select times on 31 years
                 maxtime = rawdata.shape[0]
