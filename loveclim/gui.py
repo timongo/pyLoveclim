@@ -20,7 +20,19 @@ green = "#9afe2e"
 blue = "#33adff"
 KtoC = 273.15
 moy_preind_Mora = 13.75
-moy_preind_iloveclim_SSP = 17.30
+moy_preind_iloveclim_SSP = 16.8
+MORAT = np.array([26.5, 27. , 27.5, 28. , 28.5, 29. , 29.5, 30. , 30.5, 31. , 31.5,
+                  32. , 32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. , 36.5, 37. ,
+                  37.5, 38. , 38.5, 39. , 39.5, 40. , 40.5, 41. , 41.5, 42. , 42.5,
+                  43. , 43.5, 44. , 44.5, 45. , 45.5, 46. , 46.5, 47. , 47.5, 48. ,
+                  48.5, 50.0])
+MORAH = np.array([100.109,  89.015,  82.441,  76.078,  71.895,  67.712,  63.529,
+                  59.493,  57.152,  54.812,  52.471,  50.131,  47.79 ,  45.449,
+                  43.109,  40.807,  39.081,  37.355,  35.628,  33.902,  32.175,
+                  30.449,  28.723,  26.996,  25.291,  24.016,  22.741,  21.466,
+                  20.191,  18.916,  17.641,  16.366,  15.091,  13.817,  12.55 ,
+                  11.614,  10.678,   9.742,   8.805,   7.869,   6.933,   5.997,
+                  5.06 ,   4.124,   3.188, 0.000])
 
 # set the colormap and centre the colorbar
 class MidpointNormalize(matplotlib.colors.Normalize):
@@ -68,7 +80,7 @@ class loveclim_GUI:
         nlc = len(lcfiles)
         os.chdir(path)
 
-        # files for downscaling
+        # files for ocean
         self.oceanpath = os.path.join(path, 'ocean')
         AllFiles3 = os.listdir(self.oceanpath)
         lcfiles3 = [File for File in AllFiles3 if File.endswith('.nc')]
@@ -84,13 +96,21 @@ class loveclim_GUI:
         nlc2 = len(lcfiles2)
         os.chdir(path)
 
+        # files for vegetation
+        self.vegetpath = os.path.join(path, 'vegetation')
+        AllFilesV = os.listdir(self.vegetpath)
+        lcfilesV = [File for File in AllFilesV if File.endswith('.nc')]
+        lcfilesV.sort()
+        nlcV = len(lcfilesV)
+        os.chdir(path)
+
         if nlc!=0:
             # Loveclim Atmos (A) of Vecode (V) files
-            self.AV_Open_b = tk.Button(self.frame,text="Open selected\n Atmos or Vecode File",
+            self.A_Open_b = tk.Button(self.frame,text="Open selected\n Atmos File",
                                        bg=green,
                                        highlightbackground=green,
                                        font=self.buttonfont,
-                                       command=self.AV_Open)
+                                       command=self.A_Open)
            # Scrollbar for the .nc files
             self.scrollbar = tk.Scrollbar(self.frame)
 
@@ -161,6 +181,32 @@ class loveclim_GUI:
                 self.ncFiles_lb2.insert(tk.END,filename)
             self.ncFiles_lb2.selection_set(0)
 
+        if nlcV!=0:
+            # Loveclim Vegetation
+            self.V_Open_b = tk.Button(self.frame,text="Open selected\n Vegetation File",
+                                      bg=green,
+                                      highlightbackground=green,
+                                      font=self.buttonfont,
+                                      command=self.V_Open)
+
+            # File listbox Vegetation
+            maxlen=0
+            for filename in lcfilesV:
+                l = len(filename)
+                if l>maxlen:
+                    maxlen = l
+            self.ncFiles_lbV = tk.Listbox(self.frame,
+                                         selectmode=tk.SINGLE,
+                                         yscrollcommand=self.scrollbar.set,
+                                         font=self.fieldfont,
+                                         exportselection=False,
+                                         width=maxlen)
+            self.scrollbar.config(command=self.ncFiles_lbV.yview)
+            for filename in lcfilesV:
+                self.ncFiles_lbV.insert(tk.END,filename)
+            self.ncFiles_lbV.selection_set(0)
+
+        # Quit button
         self.Quit_b = tk.Button(self.frame,
                                 text="Exit",
                                 bg=exitcolor,
@@ -175,21 +221,37 @@ class loveclim_GUI:
             self.ncFiles_lb3.grid(row=1,rowspan=1,column=0,sticky="ew")
         if nlc2!=0:
             self.ncFiles_lb2.grid(row=2,rowspan=1,column=0,sticky="ew")
+        if nlcV!=0:
+            self.ncFiles_lbV.grid(row=3,rowspan=1,column=0,sticky="ew")
+
         self.scrollbar.grid(row=0,rowspan=1,column=1,sticky="wsn")
         if nlc!=0:
-            self.AV_Open_b.grid(row=0,column=2)
+            self.A_Open_b.grid(row=0,column=2)
         if nlc3!=0:
             self.O_Open_b.grid(row=1,column=2)
         if nlc2!=0:
             self.D_Open_b.grid(row=2,column=2)
+        if nlcV!=0:
+            self.V_Open_b.grid(row=3,column=2)
 
-    def AV_Open(self):
+    def A_Open(self):
         """
         Open Atmos or Vecode file
         """
         os.chdir(self.atmospath)
         id = self.ncFiles_lb.curselection()
         self.filename = self.ncFiles_lb.get(id)
+        self.newWindow = tk.Toplevel(self.master)
+        self.app = AV_netCDF_GUI(self.newWindow, self.filename)
+        os.chdir(self.path)
+
+    def V_Open(self):
+        """
+        Open Atmos or Vecode file
+        """
+        os.chdir(self.vegetpath)
+        id = self.ncFiles_lbV.curselection()
+        self.filename = self.ncFiles_lbV.get(id)
         self.newWindow = tk.Toplevel(self.master)
         self.app = AV_netCDF_GUI(self.newWindow, self.filename)
         os.chdir(self.path)
@@ -273,19 +335,10 @@ class AV_netCDF_GUI(MidpointNormalize):
                             ccrs.Mercator,
                             ccrs.Robinson]
         # For Mora-like maps
-        Threshold_T = np.array([26.5, 27. , 27.5, 28. , 28.5, 29. , 29.5, 30. , 30.5, 31. , 31.5,
-                                32. , 32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. , 36.5, 37. ,
-                                37.5, 38. , 38.5, 39. , 39.5, 40. , 40.5, 41. , 41.5, 42. , 42.5,
-                                43. , 43.5, 44. , 44.5, 45. , 45.5, 46. , 46.5, 47. , 47.5, 48. ,
-                                48.5, 50.0])
+        Threshold_T = MORAT
         Threshold_T -= moy_preind_Mora # Mora threshold is in anomaly
-        Threshold_H = np.array([100.109,  89.015,  82.441,  76.078,  71.895,  67.712,  63.529,
-                                59.493,  57.152,  54.812,  52.471,  50.131,  47.79 ,  45.449,
-                                43.109,  40.807,  39.081,  37.355,  35.628,  33.902,  32.175,
-                                30.449,  28.723,  26.996,  25.291,  24.016,  22.741,  21.466,
-                                20.191,  18.916,  17.641,  16.366,  15.091,  13.817,  12.55 ,
-                                11.614,  10.678,   9.742,   8.805,   7.869,   6.933,   5.997,
-                                5.06 ,   4.124,   3.188, 0.000])
+        Threshold_H = MORAH
+
         # the following function gives the temperature deadly threshold 
         # as a function of the local relative humidity
         self.MoraDeadlyThreshold = interp1d(Threshold_H,Threshold_T)
