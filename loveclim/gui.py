@@ -19,7 +19,7 @@ exitcolor = "#df0101"
 green = "#9afe2e"
 blue = "#33adff"
 KtoC = 273.15
-moy_preind_Mora = 13.75
+moy_preind_Mora = 14.5
 moy_preind_iloveclim_SSP = 16.8
 MORAT = np.array([26.5, 27. , 27.5, 28. , 28.5, 29. , 29.5, 30. , 30.5, 31. , 31.5,
                   32. , 32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. , 36.5, 37. ,
@@ -321,6 +321,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         # old fields values
         self.oldfieldname = ''
         self.oldtypeval = ''
+        self.oldRitime = ''
         self.olditime = ''
 
         # Read data
@@ -631,7 +632,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                 lon,lat,data = self._PeriodicBoundaryConditions(lon,lat,data)
             else:
                 # loading data
-                londws,latdws,datadws,lon,lat,data = self._GetPlotFields(self.typeval)
+                londws,latdws,datadws,lon,lat,data = self._GetPlotFields()
                 # interp data
                 lon,lat,data = self._Perio_Interp(londws,latdws,datadws,lon,lat,data)
 
@@ -744,13 +745,15 @@ class AV_netCDF_GUI(MidpointNormalize):
         # variables that need a new data load
         self.fieldname = self._Name(self.Field_lb.get(self.Field_lb.curselection()))
         self.itime = int(self.Itime_sb.get())-1
+        self.Ritime = int(self.RItime_sb.get())-1
         self.anomaly = self.Typeval.get()=='anomaly'
         self.typeval = self.anomaly
         self.plotexists = (self.oldfieldname==self.fieldname) and (self.olditime==self.itime) \
-                and (self.oldtypeval==self.typeval)
+            and (self.oldtypeval==self.typeval) and (self.oldRitime==self.Ritime)
         if not self.plotexists:
             self.oldfieldname = self.fieldname
             self.olditime = self.itime
+            self.oldRitime = self.Ritime
             self.oldtypeval = self.typeval
 
         # variables with same data
@@ -758,7 +761,6 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.proj = self.Proj_var.get()
         self.clon = float(self.Clon_s.get())
         self.clat = float(self.Clat_s.get())
-        self.Ritime = int(self.RItime_sb.get())-1
 
     def _Enter(self,even):
         self._Replot()
@@ -767,10 +769,11 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.plotexists = False
         self._Replot()
 
-    def _GetPlotFields(self, anomaly=False):
+    def _GetPlotFields(self):
         """
         Read fields from nc file
         """
+        anomaly = self.typeval
 
         if self.AV:
             lon = self.ds['lon'][:]
@@ -812,8 +815,24 @@ class AV_netCDF_GUI(MidpointNormalize):
 
             # reconstruire les donnees avec atmphys0.f
             if self.AV:
-                return lon,lat,rawdata[self.itime,:,:]
+                # select times on 31 years
+                maxtime = rawdata.shape[0]
+                itime = self.itime
+                Ritime = self.Ritime
+                lb, up, mm = self.ibounds(itime, maxtime)
+                Rlb, Rup, Rmm = self.ibounds(Ritime, maxtime)
 
+                # if anomaly
+                if anomaly:
+                    rawdata = rawdata[lb:up,:,:] - \
+                              rawdata[Rlb:Rup,:,:]
+                else:
+                    rawdata = rawdata[lb:up,:,:]
+
+                # mean data over 31 years
+                rawdata = np.mean(a=rawdata, axis=0)
+
+                return lon,lat,rawdata
             else:
                 # loat atmos data
                 lon_atmos = self.ds_atmos['lon'][:]
@@ -835,18 +854,20 @@ class AV_netCDF_GUI(MidpointNormalize):
                 itime = self.itime
                 Ritime = self.Ritime
                 lb, up, mm = self.ibounds(itime, maxtime)
-                lba, upa, mma = self.ibounds(Ritime, amaxtime)
+                Rlb, Rup, Rmm = self.ibounds(Ritime, maxtime)
+                lba, upa, mma = self.ibounds(itime, amaxtime)
+                Rlba, Rupa, Rmma = self.ibounds(Ritime, amaxtime)
 
                 # if anomaly
                 if anomaly:
-                    rawdata = rawdata[itime-lb:itime+up,:,:] - \
-                              rawdata[Ritime-lba:Ritime+upa,:,:]
+                    rawdata = rawdata[lb:up,:,:] - \
+                              rawdata[Rlb:Rup,:,:]
                     rawdata_atmos = \
-                              rawdata_atmos[itime-lb:itime+up,:,:] - \
-                              rawdata_atmos[Ritime-lba:Ritime+upa,:,:]
+                              rawdata_atmos[lba:upa,:,:] - \
+                              rawdata_atmos[Rlba:Rupa,:,:]
                 else:
-                    rawdata = rawdata[itime-lb:itime+up,:,:]
-                    rawdata_atmos = rawdata_atmos[itime-lb:itime+up,:,:]
+                    rawdata = rawdata[lb:up,:,:]
+                    rawdata_atmos = rawdata_atmos[lb:up,:,:]
 
                 # mean data over 31 years
                 rawdata = np.mean(a=rawdata, axis=0)
@@ -864,16 +885,13 @@ class AV_netCDF_GUI(MidpointNormalize):
             return lon,lat,rawdata[self.itime,self.zvar_actual,:,:]
 
     def ibounds(self, itime, maxtime):
-        if (itime-15)>=0:
-            if (itime+15)<=maxtime: 
-                lb, up = 15, 15
-            else:
-                lb, up = 15, (maxtime-itime)
+        # lb
+        if itime<=30:
+            lb, up = 1, 31
+        elif (itime+30)>=maxtime:
+            lb, up = (maxtime-30), maxtime
         else:
-            if (itime+15)<=maxtime: 
-                lb, up = itime, 15
-            else:
-                lb, up = itime, (maxtime-itime)
+            lb, up = (itime-15), (itime+15)
         mm = (up+lb+1)
 
         return lb, up, mm
