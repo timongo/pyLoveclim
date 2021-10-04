@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import matplotlib
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -326,8 +325,7 @@ def ReadGlobals(filename):
 
     return t,Y,D,T
 
-
-def ReadNames_AV(filename):
+def ReadNames_AV(filename, AV=True):
     """
     For Atmos and Vecode
     """
@@ -336,12 +334,24 @@ def ReadNames_AV(filename):
     names = []
     long_names = []
     standard_names = []
-        
-    for v in ds.variables:
-        if 'long_name' in dir(ds[v]):
+
+    if AV:
+        for v in ds.variables:
+            if 'long_name' in dir(ds[v]):
+                names.append(str(ds.variables[v].name))
+                long_names.append(str(ds.variables[v].long_name))
+                standard_names.append(str(ds.variables[v].standard_name))
+    else:
+        DwnsN = ['Surface Temperature', 'Total Precipitation', 'Relative humidity']
+        for n, v in enumerate(ds.variables):
             names.append(str(ds.variables[v].name))
-            long_names.append(str(ds.variables[v].long_name))
-            standard_names.append(str(ds.variables[v].standard_name))
+            if n>2:
+                long_names.append(DwnsN[n-3])
+            else:
+                long_names.append(str(ds.variables[v].name))
+
+    #for i in range(len(names)):
+    #    print(names[i], long_names[i])
 
     return names,long_names,standard_names
 
