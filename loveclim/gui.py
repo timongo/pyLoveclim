@@ -437,7 +437,7 @@ class AV_netCDF_GUI(MidpointNormalize):
             rh = self.ds['r'][:][self.itime,:,:]*100
             # we take the maximum of the data and 0 (actually -.1 to always have something to plot)
             # in order to emphasize the above threshold part of the data
-            data = np.maximum(t2m.data - self.MoraDeadlyThreshold(rh.data),-1.)
+            data = np.maximum(t2m.data - self.MoraDeadlyThreshold(rh.data),0.)
             rawdata = np.ma.masked_array(data,mask=t2m.mask)
             return lon,lat,rawdata
 
