@@ -325,6 +325,21 @@ def ReadGlobals(filename):
 
     return t,Y,D,T
 
+def YearlyMean(t,T):
+    """
+    Sweeping yearly mean, assuming t is sampled every day
+    """
+
+    t_YM = t[:-360]
+    lt = len(t_YM)
+    T_YM = np.zeros(lt)
+
+    T_YM[0] = np.mean(T[:360])
+    for i in range(1,lt):
+        T_YM[i] = T_YM[i-1] + (T[i-1+360]-T[i-1])/360.
+
+    return t_YM,T_YM
+
 def ReadNames_AV(filename, AV=True):
     """
     For Atmos and Vecode
