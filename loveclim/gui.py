@@ -14,6 +14,7 @@ from scipy.ndimage import gaussian_filter
 import os, sys
 import matplotlib
 import matplotlib.pyplot as plt
+from pprint import pprint
 
 import platform
 if platform.system()=='Darwin':
@@ -430,8 +431,8 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.Itime_l = tk.Label(self.frame,
                                 text="itime: (max {:d})".format(maxi_itime),
                                 font=self.textfont)
-        self.Itime_sb.bind('<Return>',self._EnterIZ)
-        self.Itime_sb.bind('<KP_Enter>',self._EnterIZ)
+        self.Itime_sb.bind('<Return>',self._Enter)
+        self.Itime_sb.bind('<KP_Enter>',self._Enter)
         self.Time_var = tk.StringVar(self.frame)
         self.Time_var.set('')
         self.Time_l = tk.Label(self.frame,
@@ -446,8 +447,8 @@ class AV_netCDF_GUI(MidpointNormalize):
                                    from_=1,
                                    to=4,
                                    font=self.textfont)
-        self.Zvar_sb.bind('<Return>',self._EnterIZ)
-        self.Zvar_sb.bind('<KP_Enter>',self._EnterIZ)
+        self.Zvar_sb.bind('<Return>',self._Enter)
+        self.Zvar_sb.bind('<KP_Enter>',self._Enter)
         self.Zvar_var = tk.StringVar(self.frame)
         self.Zvar_var.set('')
         self.ZvarActual_l = tk.Label(self.frame,
@@ -522,8 +523,8 @@ class AV_netCDF_GUI(MidpointNormalize):
                                    from_=1,
                                    to=len(self.ds['time'][:]),
                                    font=self.textfont)
-        self.RItime_sb.bind('<Return>',self._EnterIZ)
-        self.RItime_sb.bind('<KP_Enter>',self._EnterIZ)
+        self.RItime_sb.bind('<Return>',self._Enter)
+        self.RItime_sb.bind('<KP_Enter>',self._Enter)
         self.Time_var = tk.StringVar(self.frame)
         self.Time_var.set('')
         self.Time_l = tk.Label(self.frame,
@@ -601,7 +602,7 @@ class AV_netCDF_GUI(MidpointNormalize):
 
     def load_CC(self, datmin, datmax):
         """
-        loqd colorbar values
+        load colorbar values
         """
         # update colorbar
         self.CCbar_sb = tk.Spinbox(self.frame,
@@ -666,6 +667,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                                        max_latitude=84)
         else:
             projection = projectionfun(self.clon)
+
         self.ax = plt.axes(projection=projection, label=self.label)
         self.ax.set_global()
         self.ax.coastlines()
@@ -745,8 +747,14 @@ class AV_netCDF_GUI(MidpointNormalize):
         Otherwise, recall Plot
         dummy is a the scale argument (nslide or iphi)
         """
-        self._Plot()
 
+        # check for figure 1
+        if self.plotexists:
+            plt.clf()
+            self._Plot()        
+        else:
+            self._Plot()
+            
     def _ReadParams(self):
 
         # variables that need a new data load
@@ -770,10 +778,6 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.clat = float(self.Clat_s.get())
 
     def _Enter(self,even):
-        self._Replot()
-
-    def _EnterIZ(self,even):
-        self.plotexists = False
         self._Replot()
 
     def _GetPlotFields(self):
@@ -1208,7 +1212,7 @@ class O_netCDF_GUI():
         """
         Plot using options
         """
-
+        
         self._ReadParams()
 
         lon,lat,data = self._GetPlotFields()
@@ -1221,7 +1225,7 @@ class O_netCDF_GUI():
                                        max_latitude=84)
         else:
             projection = projectionfun(self.clon)
-        
+
         self.ax = plt.axes(projection=projection)
         self.ax.set_global()
         self.ax.coastlines()
