@@ -418,10 +418,34 @@ class AV_netCDF_GUI(MidpointNormalize):
         if self.tmp_Mora1 or self.tmp_Mora2:
             self.Field_lb.insert(tk.END,'Mora Deadly Threshold (K)')
             self.lb_names.append('Temperature above threshold (K)')
+        if self.filename.find('atminst')>-1 and (self.tmp_Mora1 or self.tmp_Mora2):
+            t2m = self.ds['t2m'][:][:,:,:] - KtoC
+            t2m -= moy_preind_iloveclim_SSP
+            rh = self.ds['r'][:][:,:,:]*100
+
+            # Number of days, latitude and longitude points
+            Ndays, Nlat, Nlon = t2m.shape
+            # Number of years
+            Ny = int(Ndays/360)
+            # Number of days in a year
+            yDays = 360
+            
+            data = t2m.data - self.MoraDeadlyThreshold(rh.data)
+            MoraData = np.reshape(np.ma.masked_array(data,mask=t2m.mask),(Ny,yDays,Nlat,Nlon))
+
+            MoraDataAux = np.zeros(MoraData.shape)
+            MoraDataAux[MoraData>0.] = 1.
+            MDY = np.sum(MoraDataAux,axis=1)        
+            self.MoraDataYearly = np.ma.masked_array(MDY,mask=np.reshape(t2m,(Ny,yDays,Nlat,Nlon))[:,0,:,:].mask)
+            self.Field_lb.insert(tk.END,'Mora Deadly Threshold (days/y)')
+            self.lb_names.append('Number of days above threshold')
+
         self.Field_lb.selection_set(0)
         self.Field_lb.event_generate("<<ListboxSelect>>")
         self.Field_lb.bind("<<ListboxSelect>>",self._Enter)
             
+
+
         # itime spinbox
         maxi_itime = len(self.ds['time'][:])
         self.Itime_sb = tk.Spinbox(self.frame,
@@ -810,6 +834,8 @@ class AV_netCDF_GUI(MidpointNormalize):
 
             rawdata = np.ma.masked_array(data,mask=t2m.mask)
             return lon,lat,rawdata
+        elif self.fieldname=='morad':
+            return lon,lat,self.MoraDataYearly[self.itime,:,:]
 
 
         rawdata = self.ds[self.fieldname][:]
@@ -987,6 +1013,8 @@ class AV_netCDF_GUI(MidpointNormalize):
         
         if long_name == 'Mora Deadly Threshold (K)':
             return 'mora'
+        elif long_name == 'Mora Deadly Threshold (days/y)':
+            return 'morad'
         else:
             return self.names[self.long_names.index(long_name.split(' (')[0])]
 
