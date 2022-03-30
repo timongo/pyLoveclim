@@ -8,18 +8,17 @@ This module contains functions for simply post processing Gemmes.
 """
 
 ### imports -------------------------------------------------------------------
-import matplotlib as mpl
 from cycler import cycler
 from loveclim.gui import np, os, plt
 import sys
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib as mpl
-plt.rc('text', usetex=False)
+plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 pad = 0.
 w_pad = 0.
 h_pad = 0.
-size = 10
+size = 8
 SMALL_SIZE = size
 MEDIUM_SIZE = size
 BIGGER_SIZE = size
@@ -30,7 +29,7 @@ plt.rc('xtick', labelsize = SMALL_SIZE) # fontsize of the tick labels
 plt.rc('ytick', labelsize = SMALL_SIZE) # fontsize of the tick labels
 plt.rc('legend', fontsize = MEDIUM_SIZE) # legend fontsize
 plt.rc('figure', titlesize = BIGGER_SIZE) # fontsize of the figure title
-mpl.rcParams['lines.linewidth'] = 1.
+mpl.rcParams['lines.linewidth'] = 0.7
 mpl.rcParams['lines.markersize'] = 1.5
 
 # global constants -----------------------------------------------------
@@ -372,9 +371,10 @@ def conv_for_fortran(name='gemmesR.out', path='.', y_ini=2016,
 # for post prosess -----------------------------------------------------
 # ----------------------------------------------------------------------
 def print_VARS():
-    print()
+    print('\n0', 'time')
     for i, var in enumerate(VARS[1:]):
-        print(i, var, YCOLORS[i])
+        print(i+1, var, YCOLORS[i])
+    print()
 
 def load_data(args):
     """
@@ -970,4 +970,56 @@ def load_args():
     print('\n> Arguments loaded')
     return argdict
 
+# print_costs
+def print_costs(data, sa=0.5, nu=3.):
+    """
+    This function prints costs of transition.
+    """
+    conv10to15=1.160723971/1000. # conversion factor
 
+    time = data[:,0]
+    dt = time[-1]-time[-2]
+    pcar = data[:,16]
+    Eind = data[:,23]
+    A = data[:,25]
+    gdp0 = data[:,21]
+
+    tfc = pcar*conv10to15*Eind
+    aY0 = A*gdp0
+    cout_publique = sa*aY0 - tfc
+    cout_firmes = aY0 - cout_publique
+
+    print(' - carbon price evolution:')
+    time_int = np.arange(2017.5, 2101, 5)
+    for n, t in enumerate(time_int[:-1]):
+        tt = time_int[n+1]
+        select = (time >= t)*(time <= tt)
+        pcarmean = np.mean(pcar[select])
+        print('-- [{:.1f}, {:.1f}]: {:.2f} $/tCO2'.format(t, tt,
+            pcarmean))
+
+    print(' - mitigation costs:')
+    for n, t in enumerate([2050, 2100]):
+        select = (time <= t)
+        tot_abatprice = -dt*np.sum(aY0[select])
+        tot_cf = -dt*np.sum(cout_firmes[select])
+        tot_cp = -dt*np.sum(cout_publique[select])
+    
+        print('- from 2016 to {:d}:'.format(t))
+        print(' -- total abatment = {:.2f} 10^12 $'.format(
+            tot_abatprice)) 
+        print(' -- private cost = {:.2f} 10^12 $'.format(
+            tot_cf))
+        print(' -- public cost = {:.2f} 10^12 $\n'.format(tot_cp))
+
+def final_state(data, nu=3.):
+    flambda = data[-1,19]
+    fomega = data[-1,18]
+    fdebtratio = data[-1,20]/nu
+    print(' - final state:')
+    print(' -- lambda={:.2f}'.format(flambda)+\
+        '\n -- omega={:.2f}'.format(fomega)+\
+        '\n -- debtratio={:.2e}\n'.format(fdebtratio))
+    collapse = '{:.2f}'.format(flambda)=='0.00'
+
+    return collapse

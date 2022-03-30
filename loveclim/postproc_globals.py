@@ -96,7 +96,6 @@ def quick_view_T(bookname, path='./', ystart=1):
 
     # mean
     Ym, tmoy = average_yearly_T(T, ystart=ystart)
-    print('je suis la')
 
     # plot
     fig, ax = plt.subplots()

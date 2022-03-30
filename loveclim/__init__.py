@@ -16,3 +16,5 @@ from loveclim.postp_Gemmes import load_args
 from loveclim.postp_Gemmes import draw_figure
 from loveclim.postp_Gemmes import ferror
 from loveclim.postp_Gemmes import print_VARS
+from loveclim.postp_Gemmes import print_costs
+from loveclim.postp_Gemmes import final_state
