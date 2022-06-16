@@ -25,20 +25,11 @@ green = "#9afe2e"
 blue = "#33adff"
 KtoC = 273.15
 
-# for the temperature used in Mora's maps
-# get Earth's absolute temperature from 1961 to 1990: https://agupubs.onlinelibrary.wiley.com/doi/full/10.1002/jgrd.50359 
-data_abso_mean_1961_1990 = 0.5*(13.7 + 14.0)
-# get Earth's relative temperature from 1961 to 1990 with base 1951-1980: https://data.giss.nasa.gov/gistemp/
-data_rel_mean_1961_1990_1951_1980 = 0.01
-# get Earth's relative temperature from 1880 to 1900 with base 1951-1980: https://data.giss.nasa.gov/gistemp/
-data_rel_mean_1880_1900_1951_1980 = -0.21
-# compute Earth's relative temperature from 1961 to 1990 with base 1880-1900
-rel_mean_1961_1990_1880_1900 = data_rel_mean_1961_1990_1951_1980 - data_rel_mean_1880_1900_1951_1980
-# compute Earth's absolute temperature from 1880-1900:
-abso_mean_1880_1900 = data_abso_mean_1961_1990 - rel_mean_1961_1990_1880_1900
-moy_preind_Mora = abso_mean_1880_1900
+# use Berkely data (cf. figure 1.1, page 190, chapitre 1 du AR6 IPCC) for the period 1880-1900
+moy_preind_Mora = 13.821
 
-moy_preind_iloveclim_SSP = 17.35 # Computed from a Business as Usual scenario on the period 1850-1900
+# Computed from a Business as Usual scenario for the period 1880-1900
+moy_preind_iloveclim_SSP = 17.317
 
 MORAT = np.array([26.5, 27. , 27.5, 28. , 28.5, 29. , 29.5, 30. , 30.5, 31. , 31.5,
                   32. , 32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. , 36.5, 37. ,
@@ -708,10 +699,10 @@ class AV_netCDF_GUI(MidpointNormalize):
 
         self.ax = plt.axes(projection=projection, label=self.label)
         self.ax.set_global()
-        self.ax.coastlines()
+        self.ax.coastlines(zorder=100)
         bodr = cartopy.feature.NaturalEarthFeature(category='cultural',
-            name='admin_0_boundary_lines_land', scale='50m', facecolor='none', alpha=0.7)
-        self.ax.add_feature(bodr, linestyle='--', edgecolor='k', alpha=1)
+            name='admin_0_boundary_lines_land', scale='50m', facecolor='none', alpha=0.7, zorder=100)
+        self.ax.add_feature(bodr, linestyle='--', edgecolor='k', alpha=1, zorder=100)
 
         # colorbar
         if self.plotexists:

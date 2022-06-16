@@ -18,7 +18,7 @@ plt.rc('font', family='serif')
 pad = 0.
 w_pad = 0.
 h_pad = 0.
-size = 8
+size = 10
 SMALL_SIZE = size
 MEDIUM_SIZE = size
 BIGGER_SIZE = size
@@ -34,7 +34,7 @@ mpl.rcParams['lines.markersize'] = 1.5
 
 # global constants -----------------------------------------------------
 VARS = ['all', 'capital', 'npop', 'debt', 'wage', 'productivity', 'price',
-        'eind+eland', 'sigma', 'gsigma', 'co2at', 'co2up', 'co2lo', 'temp', 
+        'eland', 'sigma', 'gsigma', 'co2at', 'co2up', 'co2lo', 'temp', 
         'temp0', 'pbs', 'pcar', 'rb', 'omega', 'lambda', 'debtratio', 'gdp0', 'gdp',
         'eind', 'inflation', 'abat', 'n_red_fac', 'smallpi', 'smallpi_k',
         'dam', 'dam_k', 'dam_y', 'fexo', 'find', 'rcb', 'g0']
@@ -370,11 +370,47 @@ def conv_for_fortran(name='gemmesR.out', path='.', y_ini=2016,
 # ----------------------------------------------------------------------
 # for post prosess -----------------------------------------------------
 # ----------------------------------------------------------------------
-def print_VARS():
+DICVAR = {var:i+1 for i, var in enumerate(VARS[1:])}
+DICVAR['time'] = 0
+def print_VARS_old():
     print('\n0', 'time')
     for i, var in enumerate(VARS[1:]):
         print(i+1, var, YCOLORS[i])
     print()
+
+def print_VARS():
+    for key, value in DICVAR.items():
+        print(value, key)
+    print()
+
+def load_fields(path, fields, step=1):
+    """
+    Used for loading a set of fields:
+
+    INPUTS:
+        path : string
+            path of the gemmes.out file
+        fields : list (string)
+            name of fields
+        step : integer
+            step between dates
+
+    OUPUTS:
+        dic_of_data : dictionary
+            Dictionary of data
+    """
+
+    fulldata = np.loadtxt(path, skiprows=1)[::step,:]
+    dic_of_data = {}
+    for field in fields:
+        try:
+            dic_of_data[field] = fulldata[:,DICVAR[field]]
+        except KeyError:
+            raise KeyError(
+                "Field '{}' does not exist in gemmes.out".format(field)
+            )
+
+    return dic_of_data
 
 def load_data(args):
     """
@@ -640,14 +676,14 @@ def draw_figure(args, datas):
  
     dt = time[-1]-time[-2]
     select = (time <= 2050)
-    ntselect = (time[tselect] <= 2050)
+    ntselect = (time[select] <= 2050)
     tot_abatprice = -dt*np.sum(aY0[select])
     tot_cf = -dt*np.sum(cout_firmes[select])
     tot_cp = -dt*np.sum(cout_publique[select])
 
-    couevite = conv10to15*dt*np.sum(datp[select,15]*Eeco[ntselect])
-    tot_Eevite = dt*np.sum(Eeco[ntselect])
-    tot_E = dt*np.sum(Etot[select])
+    #couevite = conv10to15*dt*np.sum(datp[select,15]*Eeco[ntselect])
+    #tot_Eevite = dt*np.sum(Eeco[ntselect])
+    #tot_E = dt*np.sum(Etot[select])
 
     print('\nPoids de la transition de 2016 a 2051: ')
     print(' -- abatement total = {:.2f} 10^12 $'.format(tot_abatprice)) 
@@ -656,19 +692,19 @@ def draw_figure(args, datas):
 
     prixcar(time, datp[:,15], datp[:,14])
 
-    print('\nCout evite: int pc * (Essp85 - Etot) = {:.2f} 10^12 $'.format(couevite))
-    print('Total Emission evitees int Eeco = {:.2f} GtCO2-e'.format(tot_Eevite))
-    print('Total emissions Etot= {:.2f} GtCO2-e'.format(tot_E))
+    #print('\nCout evite: int pc * (Essp85 - Etot) = {:.2f} 10^12 $'.format(couevite))
+    #print('Total Emission evitees int Eeco = {:.2f} GtCO2-e'.format(tot_Eevite))
+    #print('Total emissions Etot= {:.2f} GtCO2-e'.format(tot_E))
 
     select = (time <= 2100)
-    ntselect = (time[tselect] <= 2100)
+    ntselect = (time[select] <= 2100)
     tot_abatprice = -dt*np.sum(aY0[select])
     tot_cf = -dt*np.sum(cout_firmes[select])
     tot_cp = -dt*np.sum(cout_publique[select])
 
-    couevite = conv10to15*dt*np.sum(datp[select,15]*Eeco[ntselect])
-    tot_Eevite = dt*np.sum(Eeco[ntselect])
-    tot_E = dt*np.sum(Etot[select])
+    #couevite = conv10to15*dt*np.sum(datp[select,15]*Eeco[ntselect])
+    #tot_Eevite = dt*np.sum(Eeco[ntselect])
+    #tot_E = dt*np.sum(Etot[select])
 
     print('')
     print('\nPoids de la transition de 2016 a 2100: ')
@@ -676,7 +712,7 @@ def draw_figure(args, datas):
     print(' -- cout sur le secteur prive = {:.2f} 10^12 $'.format(tot_cf))
     print(' -- cout sur le secteur publique = {:.2f} 10^12 $'.format(tot_cp))
 
- 
+  
     if boolcompf:
         axes[0,0].legend()
 
