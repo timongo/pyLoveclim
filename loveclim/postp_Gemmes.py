@@ -13,6 +13,7 @@ from loveclim.gui import np, os, plt
 import sys
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib as mpl
+import pandas as pd
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 pad = 0.
@@ -78,7 +79,7 @@ REORDER = [
 LABELS = ['nolab', 'K', 'N', 'D', 'W', 'a', 'p', 'E_{\mathrm{ind}} + E_{\mathrm{land}}', '\sigma',
         'g_{\sigma}', 'CO_2^{\mathrm{at}}', 'CO_2^{\mathrm{up}}', 'CO_2{\mathrm{lo}}',
         'T', 'T_0', 'p_{\mathrm{bs}}', 'p_\mathrm{c}', 'r_b', '\omega', '\lambda', '(1-A)(1-\mathrm{D}^Y)d/\\nu', 'Y^0',
-        'Y', 'E_{\mathrm{ind}}', 'i', 'A', 'n', '\pi', '\pi_K', '\mathrm{D}}', '\mathrm{D}^K', '\mathrm{D}^Y',
+        'Y', 'E_{\mathrm{ind}}', 'i', 'A', 'n', '\pi', '\pi_K', '\mathrm{D}', '\mathrm{D}^K', '\mathrm{D}^Y',
         'f_{\mathrm{exo}}', 'f_{\mathrm{ind}}', 'RCB', 'g = \dot{Y}/Y']
 LABELS = [r'$'+lab+'$' for lab in LABELS]
 YCOLORS = ['k']*len(LABELS)
@@ -412,6 +413,29 @@ def load_fields(path, fields, step=1):
 
     return dic_of_data
 
+def load_fields_DataFrame(path, fields, step=1):
+    """
+    Used for loading a set of fields as a DataFrame.
+
+    INPUTS:
+        path : string
+            path of the gemmes.out file
+        fields : list (string)
+            name of fields
+        step : integer
+            step between dates
+
+    OUPUTS:
+        data : DataFrame
+            DataFrame of data
+    """
+    
+    tmp = load_fields(path, fields, step)
+    df = pd.DataFrame(tmp)
+    
+    return df
+
+
 def load_data(args):
     """
     Fonction to load data from gemmes.
@@ -491,13 +515,13 @@ def change_mpl_opt(opt):
 
     return figsize
 
-def special_plot(axes, ax, var, time, datp, ts, reo, args):
+def special_plot(axes, ax, var, time, datp, ts, reo, fname):
     """
     Function that plots for real.
     """
     if var=='eind+eland':
         Etot = (datp[:ts,6]+datp[:ts,22])
-        ax.plot(time, Etot, label=args['fname'])
+        ax.plot(time, Etot, label=fname)
         # ssp5-8.5
         datssp85 = np.loadtxt(SSP85)
         datssp60 = np.loadtxt(SSP60)
@@ -522,24 +546,22 @@ def special_plot(axes, ax, var, time, datp, ts, reo, args):
         return tselect, Eeco, Etot
 
     elif var=='co2at':
-        ax.plot(time, datp[:ts,reo]/2.124, label=args['fname'])
+        ax.plot(time, datp[:ts,reo]/2.124, label=fname)
 
     elif var=='pbs':
-        ax.plot(time, datp[:ts,reo], label=args['fname'])
-        # ax.plot(time, datp[:ts,reo]/datp[0,reo], label=args['fname'])
+        ax.plot(time, datp[:ts,reo], label=fname)
         print('pbs/pbs0 temps final: {:.2f} \%'.format(100*datp[-1,reo]/datp[0,reo]))
     elif var=='sigma':
-        ax.plot(time, datp[:ts,reo], label=args['fname'])
-        #ax.plot(time, datp[:ts,reo]/datp[0,reo], label=args['fname'])
+        ax.plot(time, datp[:ts,reo], label=fname)
         print('sigma/sigma0 temps final: {:.2f} \%'.format(100*datp[-1,reo]/datp[0,reo]))
     elif var=='gdp':
        axes[0,4].plot(time, datp[:ts,reo], linestyle='--', 
-                      color='C0', label=args['fname'])
+                      color='C0', label=fname)
     elif var=='debtratio':
         tc = (1. - datp[:ts,24])*(1. - datp[:ts,30])
-        ax.plot(time, tc*datp[:ts,reo]/3.0, label=args['fname'])
+        ax.plot(time, tc*datp[:ts,reo]/3.0, label=fname)
     else:
-        ax.plot(time, datp[:ts,reo], label=args['fname'])
+        ax.plot(time, datp[:ts,reo], label=fname)
 
     return 0,0,0
 
@@ -563,7 +585,7 @@ def draw_figure(args, datas):
     if boolcompf: # there are two *.out files to compare
 
         if name=='default':
-            name = 'gemmes_comp.pdf'
+            name = 'gemmes_comp.svg'
 
         opt = 'all'
         nbs = 35
@@ -623,9 +645,9 @@ def draw_figure(args, datas):
         try:
             # plot and second plot
             if var=='eind+eland':
-                tselect, Eeco, Etot = special_plot(axes, ax, var, time, datp, ts, reo, args) 
+                tselect, Eeco, Etot = special_plot(axes, ax, var, time, datp, ts, reo, args['fname']) 
             else:
-                special_plot(axes, ax, var, time, datp, ts, reo, args)
+                special_plot(axes, ax, var, time, datp, ts, reo, args['fname'])
 
             # add stuff
             additional_infos(var, reo, time2, datp2, t2s, ax, axes, boolcompf,
@@ -753,7 +775,7 @@ def additional_infos(var, reo, time, datp, ts, ax, axes, boolcompf, namecompf,
     # data comparison
 
     if boolcompf:
-        special_plot(axes, ax, var, time, datp, ts, reo, args)
+        special_plot(axes, ax, var, time, datp, ts, reo, namecompf) #args['fname'])
 
     # atmospheric co2
     if var=='co2at':
