@@ -64,7 +64,7 @@ class loveclim_GUI:
     Main window
     """
 
-    def __init__(self, master):
+    def __init__(self, master, mesh=None):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -79,6 +79,7 @@ class loveclim_GUI:
         self.frame = tk.Frame(self.master)
         self.buttonfont = font.Font(family='Helvetica', size=22, weight='bold')
         font.families()
+        self.mesh = mesh
 
         path = os.getcwd()
         self.path = path
@@ -252,7 +253,7 @@ class loveclim_GUI:
         id = self.ncFiles_lb.curselection()
         self.filename = self.ncFiles_lb.get(id)
         self.newWindow = tk.Toplevel(self.master)
-        self.app = AV_netCDF_GUI(self.newWindow, self.filename)
+        self.app = AV_netCDF_GUI(self.newWindow, self.filename, self.mesh)
         os.chdir(self.path)
 
     def V_Open(self):
@@ -300,8 +301,8 @@ class AV_netCDF_GUI(MidpointNormalize):
     """
     GUI for Atmos or Vecode files
     """
-    
-    def __init__(self,master,filename,AV=True,filename_atmos='',path='',atmospath=''):
+
+    def __init__(self,master,filename,mesh,AV=True,filename_atmos='',path='',atmospath=''):
 
         self.master = master
         self.buttonfont = font.Font(family='Helvetica',
@@ -315,6 +316,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         font.families()
 
         self.frame = None
+        self.mesh = mesh
 
         self.plotexists = False
         self.fieldname = ""
@@ -350,7 +352,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         Threshold_T -= moy_preind_Mora # Mora threshold is in anomaly
         Threshold_H = MORAH
 
-        # the following function gives the temperature deadly threshold 
+        # the following function gives the temperature deadly threshold
         # as a function of the local relative humidity
         self.MoraDeadlyThreshold = interp1d(Threshold_H,Threshold_T)
 
@@ -371,7 +373,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                                 highlightbackground=exitcolor,
                                 command=self.frame.quit,
                                 font=self.buttonfont)
-         
+
         # List of names to exclude (not fields)
         if self.AV:
             excluded_names = ["lon","lat","time","P_T3","P_T4","P_U3"]
@@ -414,15 +416,20 @@ class AV_netCDF_GUI(MidpointNormalize):
                                    exportselection=False,
                                    width=maxlen)
         self.scrollbar.config(command=self.Field_lb.yview)
+        # mesh
+        if self.filename[:7]!='atminst':
+            self.Field_lb.insert(tk.END, 'Mesh')
+
         for name in self.lb_names:
             self.Field_lb.insert(tk.END,name)
-         
+
         # Mora
         self.tmp_Mora1 = ('Relative Humidity' in long_names)and('Temperature at 2 Meter' in long_names)
         self.tmp_Mora2 = ('Relative Humidity' in long_names)and('Surface Temperature' in long_names)
         if self.tmp_Mora1 or self.tmp_Mora2:
             self.Field_lb.insert(tk.END,'Mora Deadly Threshold (K)')
             self.lb_names.append('Temperature above threshold (K)')
+
         if self.filename.find('atminst')>-1 and (self.tmp_Mora1 or self.tmp_Mora2):
             t2m = self.ds['t2m'][:][:,:,:] - KtoC
             t2m -= moy_preind_iloveclim_SSP
@@ -434,13 +441,13 @@ class AV_netCDF_GUI(MidpointNormalize):
             Ny = int(Ndays/360)
             # Number of days in a year
             yDays = 360
-            
+
             data = t2m.data - self.MoraDeadlyThreshold(rh.data)
             MoraData = np.reshape(np.ma.masked_array(data,mask=t2m.mask),(Ny,yDays,Nlat,Nlon))
 
             MoraDataAux = np.zeros(MoraData.shape)
             MoraDataAux[MoraData>0.] = 1.
-            MDY = np.sum(MoraDataAux,axis=1)        
+            MDY = np.sum(MoraDataAux,axis=1)
             self.MoraDataYearly = np.ma.masked_array(MDY,mask=np.reshape(t2m,(Ny,yDays,Nlat,Nlon))[:,0,:,:].mask)
             self.Field_lb.insert(tk.END,'Mora Deadly Threshold (days/y)')
             self.lb_names.append('Number of days above threshold')
@@ -448,7 +455,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         self.Field_lb.selection_set(0)
         self.Field_lb.event_generate("<<ListboxSelect>>")
         self.Field_lb.bind("<<ListboxSelect>>",self._Enter)
-            
+
 
 
         # itime spinbox
@@ -579,7 +586,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                                    font=self.textfont)
         self.cont_sb.bind('<Return>',self._Enter)
         self.cont_sb.bind('<KP_Enter>',self._Enter)
- 
+
         # Plotbutton
         self.Plot_b = tk.Button(self.frame,text="Plot",
                                 bg=green,
@@ -717,7 +724,7 @@ class AV_netCDF_GUI(MidpointNormalize):
             self.load_CC(vmin, vmax)
         if (vmin>=vmax):
             vmin, vmax = (np.amin(data)), (np.amax(data))
-        cont = max(10,int(self.cont_sb.get()))
+        cont = max(1,int(self.cont_sb.get()))
         cmap = plt.get_cmap('coolwarm')
         levels = np.linspace(start=vmin, stop=vmax, num=cont)
 
@@ -726,12 +733,23 @@ class AV_netCDF_GUI(MidpointNormalize):
         tmp_atmos = data.copy()
         tmp_atmos[tmp_atmos<vmin] = vmin
         tmp_atmos[tmp_atmos>vmax] = vmax
- 
+
         # contourf
-        im = self.ax.contourf(lon-self.clon, lat-self.clat, tmp_atmos, levels=levels,
+        if self.fieldname=='Mesh':
+            im = self.ax.contourf(
+                lon-self.clon,
+                lat-self.clat,
+                tmp_atmos,
+                levels=1,
+                transform=ccrs.PlateCarree(self.clon),
+                cmap=cmap
+            )
+
+        else:
+            im = self.ax.contourf(lon-self.clon, lat-self.clat, tmp_atmos, levels=levels,
                               transform=ccrs.PlateCarree(self.clon),
                               cmap=cmap)
- 
+
         # post process image
         self.cb = plt.colorbar(im)
         label = self.lb_names[self.Field_lb.curselection()[0]]
@@ -747,7 +765,7 @@ class AV_netCDF_GUI(MidpointNormalize):
                 self.zvar_units))
         except AttributeError:
             self.Zvar_var.set('')
-        
+
         # end of function
         self.label += 1
         self.plotexists = True
@@ -780,10 +798,10 @@ class AV_netCDF_GUI(MidpointNormalize):
         # check for figure 1
         if self.plotexists:
             plt.clf()
-            self._Plot()        
+            self._Plot()
         else:
             self._Plot()
-            
+
     def _ReadParams(self):
 
         # variables that need a new data load
@@ -818,7 +836,7 @@ class AV_netCDF_GUI(MidpointNormalize):
         if self.AV:
             lon = self.ds['lon'][:]
             lat = self.ds['lat'][:]
-        
+
         else:
             lon = np.linspace(start=-179.75, stop=179.75, num=720)
             lat = np.linspace(start=-89.75, stop=89.75, num=360)
@@ -839,9 +857,29 @@ class AV_netCDF_GUI(MidpointNormalize):
 
             rawdata = np.ma.masked_array(data,mask=t2m.mask)
             return lon,lat,rawdata
+
         elif self.fieldname=='morad':
             return lon,lat,self.MoraDataYearly[self.itime,:,:]
 
+        elif self.fieldname=='Mesh':
+            t2m = self.ds['t2m'][:][self.itime,:,:]
+            tmp = np.zeros((lat.size, lon.size))
+            if self.mesh==None:
+                k = 0
+                for i in range(lat.size):
+                    k += 1
+                    for j in range(lon.size):
+                        tmp[i,j] = (-1.)**(k%2)
+                        k += 1
+
+            else:
+                for row in self.mesh:
+                    i = row[0]
+                    for j in row[1]:
+                        tmp[i, j] = 1.
+
+            data = np.ma.masked_array(tmp, mask=t2m.mask)
+            return lon, lat, data
 
         rawdata = self.ds[self.fieldname][:]
         fieldvar = self.ds[self.fieldname]
@@ -960,7 +998,7 @@ class AV_netCDF_GUI(MidpointNormalize):
             bc_data[:,:-1] = data.data[:,:]
             bc_data[:,-1] = data.data[:,0]
 
-            return bc_lon,bc_lat,np.ma.array(bc_data,mask=False)        
+            return bc_lon,bc_lat,np.ma.array(bc_data,mask=False)
         else:
             bc_lon = np.zeros(len(lon)+1)
             bc_data = np.zeros((data.shape[0],len(lon)+1))
@@ -988,7 +1026,7 @@ class AV_netCDF_GUI(MidpointNormalize):
 
         # oceans
         if not os.path.exists(self.oceanpath):
-            self.detect_ocean(londws, latdws) 
+            self.detect_ocean(londws, latdws)
 
         # periodic original
         lons = lon.size
@@ -1015,11 +1053,16 @@ class AV_netCDF_GUI(MidpointNormalize):
         """
         Maps long names to names
         """
-        
+
         if long_name == 'Mora Deadly Threshold (K)':
             return 'mora'
+
         elif long_name == 'Mora Deadly Threshold (days/y)':
             return 'morad'
+
+        elif long_name == 'Mesh':
+            return 'Mesh'
+
         else:
             return self.names[self.long_names.index(long_name.split(' (')[0])]
 
@@ -1051,7 +1094,7 @@ class O_netCDF_GUI():
     """
     GUI for Ocean files
     """
-    
+
     def __init__(self,master,filename):
 
         self.master = master
@@ -1138,7 +1181,7 @@ class O_netCDF_GUI():
         self.Field_lb.selection_set(0)
         self.Field_lb.event_generate("<<ListboxSelect>>")
         self.Field_lb.bind("<<ListboxSelect>>",self._Enter)
-            
+
         # itime spinbox
         self.Itime_l = tk.Label(self.frame,
                                 text="itime:",
@@ -1245,7 +1288,7 @@ class O_netCDF_GUI():
         """
         Plot using options
         """
-        
+
         self._ReadParams()
 
         lon,lat,data = self._GetPlotFields()
@@ -1273,7 +1316,7 @@ class O_netCDF_GUI():
                                                             self.depth_units))
         except AttributeError:
             self.Depth_var.set('')
-        
+
         self.plotexists = True
 
     def _Replot(self,dummy=0):
@@ -1372,25 +1415,131 @@ class O_netCDF_GUI():
         """
         Maps long names to names
         """
-        
+
         return self.names[self.long_names.index(long_name.split(' (')[0])]
 
+# ----------------------------------------------------------------------
+# GLOBAL FUNCTIONS -----------------------------------------------------
+# ----------------------------------------------------------------------
 
-def GI_netcdf(datapath='.'):
+DATES = {'y_ind':1800, 'y_mod':2015}
+DAREA = [
+    27959530246.18038,
+    64831131962.47025,
+    101152538333.0074,
+    136534314554.7540,
+    170642276000.3188,
+    203157288767.8685,
+    233775588666.2781,
+    262211239277.2192,
+    288198719666.8819,
+    311495380335.3575,
+    331883700924.8285,
+    349173318105.8821,
+    363202801639.7004,
+    373841160998.2981,
+    380989068085.3707,
+    384579784480.7819,
+    384579784480.7819,
+    380989068085.3707,
+    373841160998.2981,
+    363202801639.7004,
+    349173318105.8821,
+    331883700924.8285,
+    311495380335.3575,
+    288198719666.8819,
+    262211239277.2192,
+    233775588666.2781,
+    203157288767.8685,
+    170642276000.3188,
+    136534314554.7540,
+    101152538333.0074,
+    64831131962.47025,
+    27959530246.18038,
+]
+
+def GI_netcdf(datapath='.', mesh=None):
     """
     Function that launches the Graphics Interface for netcdf outputs.
     PARAMETER:
         datapath : string : path where there are the folder output***
-
-    """    
+        mesh : array : cells used if specified
+        mean : bool : if True, compute the mean temperature uncrease
+    """
     matplotlib.use('TkAgg')
     matplotlib.interactive('t')
     cwd = os.getcwd()
     os.chdir(datapath)
     window = tk.Tk()
-    gui = loveclim_GUI(window)
+    gui = loveclim_GUI(window, mesh=mesh)
     window.mainloop()
     os.chdir(cwd)
 
+def compute_region_anomaly(datapath='.', mesh=None, dates=DATES):
+    """
+    Compute an anomaly in regions.
+    """
+    if mesh==None:
+        raise ValueError("We cannot compute with mesh = None")
+
+    filename = os.path.join(
+        datapath,
+        'atmos',
+        'atmym001700.nc'
+    )
+    ds = nc.Dataset(filename)
+    t2m = ds['t2m'][:][:,:,:] - KtoC
+
+    ini_ind = min(t2m.shape[0], max(0, int(DATES['y_ind']-1700-15)))
+    las_ind = min(t2m.shape[0], max(0, int(DATES['y_ind']-1700+15)))
+
+    ini_mod = min(t2m.shape[0], max(0, int(DATES['y_mod']-1700-15)))
+    las_mod = min(t2m.shape[0], max(0, int(DATES['y_mod']-1700+15)))
+
+    ind_t2m = t2m[ini_ind:las_ind+1].mean(axis=0)
+    mod_t2m = t2m[ini_mod:las_mod+1].mean(axis=0)
+
+    ind_localmean = comp_anom(mesh, ind_t2m)
+    mod_localmean = comp_anom(mesh, mod_t2m)
+
+    diff = mod_localmean - ind_localmean
+
+    print('>t2m anomaly: {:.3f}\n'.format(diff))
+
+    return diff
+
+def comp_anom(mesh, t2m):
+    tot_area = 0.
+    globsum = 0.
+    for row in mesh:
+        i = row[0]
+        for j in row[1]:
+            globsum = globsum + t2m[i,j] * DAREA[i]
+            tot_area = tot_area + DAREA[i]
+
+    return globsum / tot_area
+
 if __name__ == '__main__':
     GI_netcdf()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

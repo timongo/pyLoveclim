@@ -5,8 +5,8 @@ from loveclim.postproc_globals import quick_view_T
 from loveclim.postproc_globals import get_yearly_temp_ghg
 from loveclim.postproc_globals import copy_restart
 
-
 from loveclim.gui import GI_netcdf
+from loveclim.gui import compute_region_anomaly
 
 from loveclim.postp_Gemmes import load_Gemmes_data
 from loveclim.postp_Gemmes import Gemmes_quick_view

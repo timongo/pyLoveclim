@@ -800,7 +800,7 @@ def additional_infos(var, reo, time, datp, ts, ax, axes, boolcompf, namecompf,
         ax.plot([2095, 2105], [3.6, 3.6], color='red', linestyle='--')
         ax.text(x=2107, y=3.6, s='SSP3-7.0', color='red')
 
-    elif var=='capital' or var=='npop' or var=='debt' or var=='wage' or var=='gdp0':
+    elif var=='capital' or var=='debt' or var=='wage' or var=='gdp0':
         ax.set_ylim(ymin=0.)
 
     #elif var=='pbs':
@@ -963,7 +963,7 @@ def load_args():
 
     # try to find help
     for arg in argl:
-        if arg=='-h':
+        if arg=='-help':
             fusage()
 
     # find arguments
