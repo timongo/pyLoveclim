@@ -14,8 +14,9 @@ from scipy.ndimage import gaussian_filter
 import os, sys
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 from pprint import pprint
-
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import platform
 if platform.system()=='Darwin':
     matplotlib.use('MacOSX')
@@ -43,6 +44,7 @@ MORAH = np.array([100.109,  89.015,  82.441,  76.078,  71.895,  67.712,  63.529,
                   20.191,  18.916,  17.641,  16.366,  15.091,  13.817,  12.55 ,
                   11.614,  10.678,   9.742,   8.805,   7.869,   6.933,   5.997,
                   5.06 ,   4.124,   3.188, 0.000])
+crop_map_path = '/home/admin/Documents/sciences/postdocGU/codes/pyPOPULATION/code_and_data/data/cartes/crop_map_alpha.png'
 
 # set the colormap and centre the colorbar
 class MidpointNormalize(matplotlib.colors.Normalize):
@@ -699,17 +701,37 @@ class AV_netCDF_GUI(MidpointNormalize):
         if self.proj=='Orthographic':
             projection = projectionfun(self.clon,self.clat)
         elif self.proj=='Mercator':
-            projection = projectionfun(central_longitude=self.clon, min_latitude=-80,
-                                       max_latitude=84)
+            projection = projectionfun(
+                central_longitude=self.clon,
+                min_latitude=-80,
+                max_latitude=84
+            )
         else:
             projection = projectionfun(self.clon)
 
         self.ax = plt.axes(projection=projection, label=self.label)
         self.ax.set_global()
         self.ax.coastlines(zorder=100)
-        bodr = cartopy.feature.NaturalEarthFeature(category='cultural',
-            name='admin_0_boundary_lines_land', scale='50m', facecolor='none', alpha=0.7, zorder=100)
+        bodr = cartopy.feature.NaturalEarthFeature(
+            category='cultural',
+            name='admin_0_boundary_lines_land',
+            scale='50m',
+            facecolor='none',
+            alpha=0.7,
+            zorder=100
+        )
         self.ax.add_feature(bodr, linestyle='--', edgecolor='k', alpha=1, zorder=100)
+        if self.fieldname=='Mesh':
+            gl = self.ax.gridlines(
+                crs=ccrs.PlateCarree(),
+                draw_labels=False,
+                linewidth=1,
+                color='gray',
+                alpha=0.5,
+                linestyle='--',
+            )
+            gl.xlines = True
+            gl.ylines = True
 
         # colorbar
         if self.plotexists:
@@ -736,27 +758,46 @@ class AV_netCDF_GUI(MidpointNormalize):
 
         # contourf
         if self.fieldname=='Mesh':
-            im = self.ax.contourf(
+            if self.proj=='Mercator':
+                transform = ccrs.Mercator(self.clon-180.)
+            else:
+                transform = ccrs.PlateCarree(self.clon-180.)
+
+            extent = list(self.ax.get_xlim() + self.ax.get_ylim())
+            extent[2] *= 0.98
+            image = plt.imread(crop_map_path)
+            implot = self.ax.imshow(
+                image,
+                extent=extent,
+            )
+            data_masked = np.ma.masked_where(tmp_atmos==0., tmp_atmos)
+            im = self.ax.pcolormesh(
                 lon-self.clon,
                 lat-self.clat,
-                tmp_atmos,
-                levels=1,
+                data_masked,
                 transform=ccrs.PlateCarree(self.clon),
+                alpha=0.3,
                 cmap=cmap
             )
 
         else:
-            im = self.ax.contourf(lon-self.clon, lat-self.clat, tmp_atmos, levels=levels,
-                              transform=ccrs.PlateCarree(self.clon),
-                              cmap=cmap)
+            im = self.ax.contourf(
+                lon-self.clon,
+                lat-self.clat,
+                tmp_atmos,
+                levels=levels,
+                transform=ccrs.PlateCarree(self.clon),
+                cmap=cmap
+            )
 
-        # post process image
-        self.cb = plt.colorbar(im)
-        label = self.lb_names[self.Field_lb.curselection()[0]]
-        if self.anomaly:
-            label += ' (anomaly)'
-        self.cb.ax.set_ylabel(label)
-        self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
+            # post process image
+            self.cb = plt.colorbar(im)
+            label = self.lb_names[self.Field_lb.curselection()[0]]
+            if self.anomaly:
+                label += ' (anomaly)'
+            self.cb.ax.set_ylabel(label)
+            self.Time_var.set('Time label = {:d}'.format(int(self.ds['time'][self.itime])))
+
         try:
             self.Zvar_var.set('{:} @ {:} = {:d} {:}'.format(
                 self.Field_lb.get(self.Field_lb.curselection()),
@@ -871,7 +912,6 @@ class AV_netCDF_GUI(MidpointNormalize):
                     for j in range(lon.size):
                         tmp[i,j] = (-1.)**(k%2)
                         k += 1
-
             else:
                 for row in self.mesh:
                     i = row[0]
