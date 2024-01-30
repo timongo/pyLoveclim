@@ -7,6 +7,7 @@ from loveclim.postproc_globals import copy_restart
 
 from loveclim.gui import GI_netcdf
 from loveclim.gui import compute_region_anomaly
+from loveclim.gui import dam
 
 from loveclim.postp_Gemmes import load_Gemmes_data
 from loveclim.postp_Gemmes import Gemmes_quick_view

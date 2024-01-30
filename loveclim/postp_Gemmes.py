@@ -38,7 +38,7 @@ VARS = ['all', 'capital', 'npop', 'debt', 'wage', 'productivity', 'price',
         'eland', 'sigma', 'gsigma', 'co2at', 'co2up', 'co2lo', 'temp', 
         'temp0', 'pbs', 'pcar', 'rb', 'omega', 'lambda', 'debtratio', 'gdp0', 'gdp',
         'eind', 'inflation', 'abat', 'n_red_fac', 'smallpi', 'smallpi_k',
-        'dam', 'dam_k', 'dam_y', 'fexo', 'find', 'rcb', 'g0']
+        'dam', 'dam_k', 'dam_y', 'fexo', 'find', 'rcb', 'g0', 'investment', 'pir']
 REORDER = [
     0,  #capital k
     1,  #npop k
@@ -62,8 +62,8 @@ REORDER = [
     24, #abat r
     7,  #sigma r
     8,  #gsigma k
-    32, #find k
-    31, #fexo k
+    35, #investment
+    36, #pir
     22, #eind k
     6,  #eind+eland k
     9,  #co2at k
@@ -80,7 +80,7 @@ LABELS = ['nolab', 'K', 'N', 'D', 'W', 'a', 'p', 'E_{\mathrm{ind}} + E_{\mathrm{
         'g_{\sigma}', 'CO_2^{\mathrm{at}}', 'CO_2^{\mathrm{up}}', 'CO_2{\mathrm{lo}}',
         'T', 'T_0', 'p_{\mathrm{bs}}', 'p_\mathrm{c}', 'r_b', '\omega', '\lambda', '(1-A)(1-\mathrm{D}^Y)d/\\nu', 'Y^0',
         'Y', 'E_{\mathrm{ind}}', 'i', 'A', 'n', '\pi', '\pi_K', '\mathrm{D}', '\mathrm{D}^K', '\mathrm{D}^Y',
-        'f_{\mathrm{exo}}', 'f_{\mathrm{ind}}', 'RCB', 'g = \dot{Y}/Y']
+        'f_{\mathrm{exo}}', 'f_{\mathrm{ind}}', 'RCB', 'g = \dot{Y}/Y', 'I', '\Pi_r']
 LABELS = [r'$'+lab+'$' for lab in LABELS]
 YCOLORS = ['k']*len(LABELS)
 for i in [5, 7, 13, 18, 19, 20, 24]:
@@ -560,6 +560,21 @@ def special_plot(axes, ax, var, time, datp, ts, reo, fname):
     elif var=='debtratio':
         tc = (1. - datp[:ts,24])*(1. - datp[:ts,30])
         ax.plot(time, tc*datp[:ts,reo]/3.0, label=fname)
+
+    elif var=='investment':
+        # ici consommation
+        conso = 1. - datp[:ts, reo] / datp[:ts,5] / datp[:ts,21]
+        ax.plot(time, conso, label=fname)
+
+    elif var=='pir':
+        # ici epargne des ménages
+        div = datp[:ts,26]*datp[:ts,5]*datp[:ts,21] - datp[:ts, reo]
+        wL = datp[:ts,3] * datp[:ts,18] * datp[:ts,21]
+        conso = datp[:ts,5] * datp[:ts,21] - datp[:ts, reo]
+        savings = div + wL - conso
+        savings = savings / datp[:ts,5] / datp[:ts,21]
+        ax.plot(time, savings, label=fname)
+
     else:
         ax.plot(time, datp[:ts,reo], label=fname)
 
@@ -660,6 +675,11 @@ def draw_figure(args, datas):
                 ax.set_ylabel(r'$Y^0$ (plain)          $Y$ (dotted)')
             elif var=='gdp':
                 ax.set_ylabel(r'GDP growth')
+            elif var=='pir':
+                ax.set_ylabel('Cap. savings to GDP')
+            elif var=='investment':
+                ax.set_ylabel('Consumption to GDP')
+
             else:
                 ax.set_ylabel(LABELS[reo+1]) # var
             ax.xaxis.set_minor_locator(AutoMinorLocator())
@@ -679,7 +699,7 @@ def draw_figure(args, datas):
         i += 1
 
     # transfer = Sfc - Tfc
-    sa = np.float64(input("input value of sa: "))
+    sa = 0. #np.float64(input("input value of sa: "))
     conv10to15=1.160723971/1000. # conversion factor
     tfc = datp[:,15]*conv10to15*datp[:,22]
     aY0 = datp[:,24]*datp[:,20]
@@ -787,10 +807,10 @@ def additional_infos(var, reo, time, datp, ts, ax, axes, boolcompf, namecompf,
     # total emissions
     elif var=='eind+eland':
         ax.set_xlim(xmin=2015, xmax=time_main.max())
-        ax.set_ylim(ymin=0, ymax=170)
+        #ax.set_ylim(ymin=0, ymax=170)
 
     elif var=='debtratio':
-       ax.set_ylim(0., 1.1)
+       ax.set_ylim(-1.3, 1.3)
        ax.plot([time_main[0], time_main[-1]], [1., 1.], '--', color='r')
 
     #elif var=='g0':
@@ -800,17 +820,17 @@ def additional_infos(var, reo, time, datp, ts, ax, axes, boolcompf, namecompf,
         ax.plot([2095, 2105], [3.6, 3.6], color='red', linestyle='--')
         ax.text(x=2107, y=3.6, s='SSP3-7.0', color='red')
 
-    elif var=='capital' or var=='debt' or var=='wage' or var=='gdp0':
-        ax.set_ylim(ymin=0.)
+    #elif var=='capital' or var=='debt' or var=='wage' or var=='gdp0':
+    #    ax.set_ylim(ymin=0.)
 
     #elif var=='pbs':
     #    ax.set_ylim(0., 1.)
 
-    elif var=='n_red_fac':
-        ax.set_ylim(0, 1.1)
+    #elif var=='n_red_fac':
+    #    ax.set_ylim(0, 1.1)
 
-    elif var=='lambda' or var=='omega' or var=='n_red_fac':
-        ax.set_ylim(0, 1.1)
+    #elif var=='lambda' or var=='omega' or var=='n_red_fac':
+    #    ax.set_ylim(0, 1.1)
 
     #elif var=='sigma':
     #    ax.set_ylim(0, 1.2)
@@ -819,14 +839,14 @@ def additional_infos(var, reo, time, datp, ts, ax, axes, boolcompf, namecompf,
         ax.plot([2030, 2030], [0., 100], color='r', linestyle='--')
         ax.plot([2050, 2050], [0., 400], color='r', linestyle='--')
 
-    elif var=='smallpi' or var=='smallpi_k':
-        ax.set_ylim(-0.5, 1)
+    #elif var=='smallpi' or var=='smallpi_k':
+    #    ax.set_ylim(-0.5, 1)
 
-    elif var=='abat':
-        ax.set_ylim(0, 0.2)
+    #elif var=='abat':
+    #    ax.set_ylim(0, 0.2)
 
-    elif var=='inflation' or var=='rb' or var=='rcb':
-        ax.set_ylim(ymin=-0.3, ymax=0.2)
+    #elif var=='inflation' or var=='rb' or var=='rcb':
+    #    ax.set_ylim(ymin=-0.3, ymax=0.2)
 
 def makedatadic(data):
     """
@@ -991,6 +1011,11 @@ def load_args():
             elif Arg=='fname':
                 try:
                     argdict['fname'] = argl[n+1]
+                except IndexError:
+                    ferror(key=1, msg=Arg)
+            elif Arg=='path':
+                try:
+                    argdict['path'] = argl[n+1]
                 except IndexError:
                     ferror(key=1, msg=Arg)
             elif Arg=='multi':

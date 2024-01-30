@@ -1515,9 +1515,34 @@ def GI_netcdf(datapath='.', mesh=None):
     window.mainloop()
     os.chdir(cwd)
 
-def compute_region_anomaly(datapath='.', mesh=None, dates=DATES):
+def compute_region_anomaly(
+        datapath='.',
+        mesh=None,
+        dates=DATES,
+        ind_glob_temp=19.817,
+        scale=0.225,
+        slope=1.1,
+    ):
     """
     Compute an anomaly in regions.
+
+    ...
+
+    Arguments
+    ---------
+    datapath : string
+        the path of data
+    mesh : list
+        list under the form of a mesh
+
+    ...
+
+    Returns
+    ------
+    ind_localmean
+    mod_localmean
+    deg
+    tot_area
     """
     if mesh==None:
         raise ValueError("We cannot compute with mesh = None")
@@ -1530,23 +1555,37 @@ def compute_region_anomaly(datapath='.', mesh=None, dates=DATES):
     ds = nc.Dataset(filename)
     t2m = ds['t2m'][:][:,:,:] - KtoC
 
-    ini_ind = min(t2m.shape[0], max(0, int(DATES['y_ind']-1700-15)))
-    las_ind = min(t2m.shape[0], max(0, int(DATES['y_ind']-1700+15)))
+    ini_ind = min(t2m.shape[0], max(0, int(dates['y_ind']-1700-15)))
+    las_ind = min(t2m.shape[0], max(0, int(dates['y_ind']-1700+15)))
 
-    ini_mod = min(t2m.shape[0], max(0, int(DATES['y_mod']-1700-15)))
-    las_mod = min(t2m.shape[0], max(0, int(DATES['y_mod']-1700+15)))
+    ini_2015 = min(t2m.shape[0], max(0, int(2015-1700-15)))
+    las_2015 = min(t2m.shape[0], max(0, int(2015-1700+15)))
+
+    ini_mod = min(t2m.shape[0], max(0, int(dates['y_mod']-1700-15)))
+    las_mod = min(t2m.shape[0], max(0, int(dates['y_mod']-1700+15)))
 
     ind_t2m = t2m[ini_ind:las_ind+1].mean(axis=0)
+    t2m_2015 = t2m[ini_2015:las_2015+1].mean(axis=0)
     mod_t2m = t2m[ini_mod:las_mod+1].mean(axis=0)
 
-    ind_localmean = comp_anom(mesh, ind_t2m)
-    mod_localmean = comp_anom(mesh, mod_t2m)
+    ind_localmean, tot_area = comp_anom(mesh, ind_t2m)
+    localmean_2015, tot_area = comp_anom(mesh, t2m_2015)
+    mod_localmean, tot_area = comp_anom(mesh, mod_t2m)
 
-    diff = mod_localmean - ind_localmean
+    diff_ini = (localmean_2015 - ind_localmean) / tot_area
+    diff = (mod_localmean - localmean_2015) / tot_area
 
-    print('>t2m anomaly: {:.3f}\n'.format(diff))
+    diff_ini += scale * (ind_localmean / tot_area - ind_glob_temp)
 
-    return diff
+    deg = slope * diff + diff_ini
+    print('>anom 2015 / pre-ind: {:.3f}'.format(diff_ini))
+    #print('>t2m ind: {:.3f}'.format(ind_localmean / tot_area))
+    #print('>t2m 2015: {:.3f}'.format(localmean_2015 / tot_area))
+    #print('>t2m mod: {:.3f}'.format(mod_localmean / tot_area))
+    print('>anom current / 2015: {:.3f}'.format(diff))
+    print('>damages: {:.1f} %\n'.format(100*dam(deg)))
+
+    return ind_localmean, mod_localmean, deg, tot_area
 
 def comp_anom(mesh, t2m):
     tot_area = 0.
@@ -1557,7 +1596,22 @@ def comp_anom(mesh, t2m):
             globsum = globsum + t2m[i,j] * DAREA[i]
             tot_area = tot_area + DAREA[i]
 
-    return globsum / tot_area
+    return globsum, tot_area
+
+def dam(deg, pi1=0., pi2=0.00236, pi3=0.0000819, zeta3=6.754):
+    if type(deg)==np.float64:
+        for_float = True
+        Deg = np.asarray([deg])
+    else:
+        for_float = False
+        Deg = np.asarray(deg)
+    Deg[Deg<0.] = 0.
+    sdam = 1. - 1./(1. + pi1 * Deg + pi2 * Deg**2 + pi3 * Deg**zeta3)
+    sdam[sdam>1.] = 1.
+    if for_float:
+        return sdam[0]
+    else:
+        return sdam
 
 if __name__ == '__main__':
     GI_netcdf()
