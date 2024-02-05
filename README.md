@@ -12,7 +12,7 @@ iLOVECLIM is available at: [https://www.elic.ucl.ac.be/modx/index.php?id=289](ht
 
 # \#2 Select the data to plot, the location and the colobar boundaries
 
-![Second step](./figures/pyloveclim_2.png)
+![Second step](./figures/pyloveclim-2.png)
 
 # \#3 Result with the surface temperature
 
